@@ -5162,35 +5162,7 @@ edge-currency-monero@^0.3.3:
 
 edge-currency-plugins@./deps/edge-currency-plugins.tgz:
   version "0.0.1"
-  uid "9287dbb948e9581cbf2424941c26fbc3692b82b9"
-  resolved "./deps/edge-currency-plugins.tgz#9287dbb948e9581cbf2424941c26fbc3692b82b9"
-  dependencies:
-    altcoin-js "git://github.com/EdgeApp/altcoin-js.git#master"
-    async-mutex "^0.2.6"
-    baselet "^0.2.1"
-    biggystring "^4.0.0"
-    bip32 "^2.0.5"
-    bip32grs "^2.0.5"
-    bip39 "^3.0.2"
-    bitcoinjs-message "^2.2.0"
-    blake-hash "^2.0.0"
-    bn.js "^5.1.2"
-    bs58 "^4.0.1"
-    bs58grscheck "^2.1.2"
-    bs58smartcheck "^2.0.4"
-    cleaners "^0.3.12"
-    disklet "^0.4.5"
-    edge-core-js "^0.18.9"
-    memlet "^0.1.5"
-    uri-js "^4.4.0"
-    url-parse "^1.5.2"
-    wif-smart "^2.0.0"
-    wifgrs "^2.0.6"
-    ws "^7.4.6"
-
-edge-currency-plugins@./deps/edge-currency-plugins/9287dbb948e9581cbf2424941c26fbc3692b82b9.tgz:
-  version "0.0.1"
-  resolved "./deps/edge-currency-plugins/9287dbb948e9581cbf2424941c26fbc3692b82b9.tgz#9287dbb948e9581cbf2424941c26fbc3692b82b9"
+  resolved "./deps/edge-currency-plugins.tgz#88e961b395a4cf5b513eda284e95200d4dcb8618"
   dependencies:
     altcoin-js "git://github.com/EdgeApp/altcoin-js.git#master"
     async-mutex "^0.2.6"
