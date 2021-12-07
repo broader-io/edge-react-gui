@@ -1,6 +1,7 @@
 // @flow
 
 import { bns, div, eq, gt, gte, mul, toFixed } from 'biggystring'
+import type { Disklet } from 'disklet'
 import type { EdgeCurrencyInfo, EdgeCurrencyWallet, EdgeDenomination, EdgeMetaToken, EdgeReceiveAddress, EdgeTransaction } from 'edge-core-js'
 import React from 'react'
 import { Linking, Platform } from 'react-native'
@@ -16,6 +17,7 @@ import { convertCurrency, convertCurrencyFromExchangeRates } from '../selectors/
 import { type RootState } from '../types/reduxTypes.js'
 import type { CustomTokenInfo, ExchangeData, GuiDenomination, GuiWallet, TransactionListTx } from '../types/types.js'
 import { type GuiExchangeRates } from '../types/types.js'
+import { getUserTutorialList, setUserTutorialList } from './tutorial.js'
 
 export const DECIMAL_PRECISION = 18
 
@@ -880,12 +882,16 @@ export function unixToLocaleDateTime(unixDate: number): { date: string, time: st
   }
 }
 
-export async function checkTokenTermsAndAgreement(wallets: { [walletId: string]: GuiWallet }): Promise<boolean> {
+export async function checkTokenTermsAndAgreement(wallets: { [walletId: string]: GuiWallet }, disklet: Disklet): Promise<boolean> {
+  const userTutorialList = await getUserTutorialList(disklet)
+  const { hasAgreedToTokensTerms } = userTutorialList
   const hasTokenEnabled = Object.keys(wallets).find((walletId: string) => wallets[walletId].enabledTokens.length > 0)
   const hasAgreed = () =>
     Airship.show(bridge => <ConfirmContinueModal bridge={bridge} title={s.strings.token_agreement_modal_title} body={s.strings.token_agreement_modal_body} />)
 
-  if (hasTokenEnabled == null && !(await hasAgreed())) return false
+  if (!hasAgreedToTokensTerms && hasTokenEnabled == null && !(await hasAgreed())) return false
+
+  !hasAgreedToTokensTerms && setUserTutorialList({ ...userTutorialList, hasAgreedToTokensTerms: true }, disklet)
 
   return true
 }

@@ -1,5 +1,6 @@
 // @flow
 
+import type { Disklet } from 'disklet'
 import type { EdgeMetaToken } from 'edge-core-js'
 import { difference, keys, union } from 'lodash'
 import * as React from 'react'
@@ -32,6 +33,7 @@ type DispatchProps = {
 }
 
 type StateProps = {
+  disklet: Disklet,
   wallets: { [walletId: string]: GuiWallet },
   manageTokensPending: boolean,
   metaTokens: EdgeMetaToken[],
@@ -173,9 +175,9 @@ class ManageTokensSceneComponent extends React.Component<Props, State> {
   }
 
   saveEnabledTokenList = async () => {
-    if (this.state.enabledList.length > 0 && !(await checkTokenTermsAndAgreement(this.props.wallets))) return
+    const { disklet, navigation, route, wallets } = this.props
+    if (this.state.enabledList.length > 0 && !(await checkTokenTermsAndAgreement(wallets, disklet))) return
 
-    const { navigation, route } = this.props
     const { guiWallet } = route.params
     const { id } = guiWallet
     const disabledList: string[] = []
@@ -295,6 +297,7 @@ export const ManageTokensScene = connect<StateProps, DispatchProps, OwnProps>(
     const wallets = state.ui.wallets.byId
     const wallet = wallets[guiWallet.id]
     return {
+      disklet: state.core.disklet,
       manageTokensPending: state.ui.wallets.manageTokensPending,
       settingsCustomTokens: state.ui.settings.customTokens,
       metaTokens: wallet.metaTokens,

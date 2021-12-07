@@ -1,5 +1,6 @@
 // @flow
 
+import type { Disklet } from 'disklet'
 import { type EdgeAccount, type EdgeCurrencyWallet } from 'edge-core-js'
 import * as React from 'react'
 import { View } from 'react-native'
@@ -29,6 +30,7 @@ type OwnProps = {
 type StateProps = {
   account: EdgeAccount,
   defaultIsoFiat: string,
+  disklet: Disklet,
   wallets: { [string]: GuiWallet }
 }
 
@@ -57,10 +59,10 @@ class WalletListCreateRowComponent extends React.PureComponent<Props & DispatchP
   }
 
   createAndSelectToken = async () => {
-    const { account, createTokenType, onPress, tokenCreated, wallets, defaultIsoFiat } = this.props
+    const { account, createTokenType, defaultIsoFiat, disklet, onPress, tokenCreated, wallets } = this.props
     const { currencyWallets } = account
 
-    if (!(await checkTokenTermsAndAgreement(wallets))) return
+    if (!(await checkTokenTermsAndAgreement(wallets, disklet))) return
 
     try {
       if (createTokenType == null) throw new Error('Invalid Create Token Type')
@@ -164,6 +166,7 @@ export const WalletListCreateRow = connect<StateProps, DispatchProps, OwnProps>(
   state => ({
     wallets: state.ui.wallets.byId,
     account: state.core.account,
+    disklet: state.core.disklet,
     defaultIsoFiat: state.ui.settings.defaultIsoFiat
   }),
   dispatch => ({
