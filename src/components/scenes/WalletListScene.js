@@ -9,7 +9,7 @@ import { updateActiveWalletsOrder } from '../../actions/WalletListActions.js'
 import s from '../../locales/strings.js'
 import { connect } from '../../types/reactRedux.js'
 import { type GuiWallet } from '../../types/types.js'
-import { getWalletListSlideTutorial, setUserTutorialList } from '../../util/tutorial.js'
+import { getUserTutorialList, setUserTutorialList } from '../../util/tutorial.js'
 import { CrossFade } from '../common/CrossFade.js'
 import { SceneWrapper } from '../common/SceneWrapper.js'
 import { WalletListSlidingTutorialModal } from '../modals/WalletListSlidingTutorialModal.js'
@@ -26,7 +26,6 @@ import { WiredProgressBar } from '../themed/WiredProgressBar.js'
 
 type StateProps = {
   activeWalletIds: string[],
-  userId: string,
   wallets: { [walletId: string]: GuiWallet },
   disklet: Disklet,
   needsPasswordCheck: boolean
@@ -57,16 +56,15 @@ class WalletListComponent extends React.PureComponent<Props, State> {
   }
 
   showTutorial = async () => {
-    const { disklet, userId } = this.props
+    const { disklet } = this.props
     try {
-      const userTutorialList = await getWalletListSlideTutorial(userId, disklet)
-      const tutorialCount = userTutorialList.walletListSlideTutorialCount || 0
+      const userTutorialList = await getUserTutorialList(disklet)
+      const tutorialCount = userTutorialList?.walletListSlideTutorialCount != null ? userTutorialList.walletListSlideTutorialCount : 0
 
       if (tutorialCount < 2) {
         Airship.show(bridge => <WalletListSlidingTutorialModal bridge={bridge} />)
         this.setState({ showSlidingTutorial: true })
-        userTutorialList.walletListSlideTutorialCount = tutorialCount + 1
-        await setUserTutorialList(userTutorialList, disklet)
+        await setUserTutorialList({ ...userTutorialList, walletListSlideTutorialCount: tutorialCount + 1 }, disklet)
       }
     } catch (error) {
       console.log(error)
@@ -202,7 +200,6 @@ export const WalletListScene = connect<StateProps, DispatchProps, {}>(
 
     return {
       activeWalletIds,
-      userId: state.core.account.id,
       wallets: state.ui.wallets.byId,
       disklet: state.core.disklet,
       needsPasswordCheck: state.ui.passwordReminder.needsPasswordCheck

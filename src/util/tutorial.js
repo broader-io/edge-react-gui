@@ -1,22 +1,23 @@
 // @flow
 import type { Disklet } from 'disklet'
 
-const TUTORIAL = 'tutorial.json'
+import { TUTORIAL } from '../constants/constantSettings.js'
 
-type UserTutorialList = {
-  walletListSlideTutorialCount: number
-}
+type UserTutorialList = {|
+  walletListSlideTutorialCount: number,
+  hasAgreedToTokensTerms: boolean
+|}
 
-export const getWalletListSlideTutorial = async (userId: string, disklet: Disklet): Promise<UserTutorialList> => {
+export const getUserTutorialList = async (disklet: Disklet): Promise<UserTutorialList> => {
   try {
-    const userTutorialList = JSON.parse(await disklet.getText(TUTORIAL))
-    return userTutorialList
+    return JSON.parse(await disklet.getText(TUTORIAL))
   } catch (error) {
     console.log(error)
-    return { walletListSlideTutorialCount: 0 }
+    return {
+      walletListSlideTutorialCount: 0,
+      hasAgreedToTokensTerms: false
+    }
   }
 }
 
-export const setUserTutorialList = async (data: UserTutorialList, disklet: Disklet): Promise<void> => {
-  await disklet.setText(TUTORIAL, JSON.stringify(data))
-}
+export const setUserTutorialList = async (data: UserTutorialList, disklet: Disklet): Promise<void> => await disklet.setText(TUTORIAL, JSON.stringify(data))
