@@ -11,7 +11,7 @@ import s from '../../locales/strings.js'
 import { connect } from '../../types/reactRedux.js'
 import { type NavigationProp, type RouteProp } from '../../types/routerTypes.js'
 import type { CustomTokenInfo, GuiWallet } from '../../types/types.js'
-import { mergeTokensRemoveInvisible } from '../../util/utils'
+import { checkTokenTermsAndAgreement, mergeTokensRemoveInvisible } from '../../util/utils'
 import { SceneWrapper } from '../common/SceneWrapper.js'
 import { WalletListModal } from '../modals/WalletListModal'
 import { Airship } from '../services/AirshipInstance'
@@ -172,7 +172,9 @@ class ManageTokensSceneComponent extends React.Component<Props, State> {
     this.setState({ searchValue: value })
   }
 
-  saveEnabledTokenList = () => {
+  saveEnabledTokenList = async () => {
+    if (this.state.enabledList.length > 0 && !(await checkTokenTermsAndAgreement(this.props.wallets))) return
+
     const { navigation, route } = this.props
     const { guiWallet } = route.params
     const { id } = guiWallet

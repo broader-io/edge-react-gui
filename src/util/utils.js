@@ -2,9 +2,12 @@
 
 import { bns, div, eq, gt, gte, mul, toFixed } from 'biggystring'
 import type { EdgeCurrencyInfo, EdgeCurrencyWallet, EdgeDenomination, EdgeMetaToken, EdgeReceiveAddress, EdgeTransaction } from 'edge-core-js'
+import React from 'react'
 import { Linking, Platform } from 'react-native'
 import SafariView from 'react-native-safari-view'
 
+import { ConfirmContinueModal } from '../components/modals/ConfirmContinueModal.js'
+import { Airship } from '../components/services/AirshipInstance.js'
 import { FEE_ALERT_THRESHOLD, FEE_COLOR_THRESHOLD, FIAT_CODES_SYMBOLS, FIAT_PRECISION, getSymbolFromCurrency } from '../constants/WalletAndCurrencyConstants.js'
 import { formatNumber, toLocaleDate, toLocaleDateTime, toLocaleTime } from '../locales/intl.js'
 import s from '../locales/strings.js'
@@ -875,4 +878,14 @@ export function unixToLocaleDateTime(unixDate: number): { date: string, time: st
     time: toLocaleTime(date),
     dateTime: toLocaleDateTime(date)
   }
+}
+
+export async function checkTokenTermsAndAgreement(wallets: { [walletId: string]: GuiWallet }): Promise<boolean> {
+  const hasTokenEnabled = Object.keys(wallets).find((walletId: string) => wallets[walletId].enabledTokens.length > 0)
+  const hasAgreed = () =>
+    Airship.show(bridge => <ConfirmContinueModal bridge={bridge} title={s.strings.token_agreement_modal_title} body={s.strings.token_agreement_modal_body} />)
+
+  if (hasTokenEnabled == null && !(await hasAgreed())) return false
+
+  return true
 }

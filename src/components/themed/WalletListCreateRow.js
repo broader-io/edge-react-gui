@@ -13,6 +13,7 @@ import { setEnabledTokens } from '../../modules/Core/Wallets/EnabledTokens.js'
 import { connect } from '../../types/reactRedux.js'
 import type { CreateTokenType, CreateWalletType, GuiWallet } from '../../types/types.js'
 import { getCreateWalletType } from '../../util/CurrencyInfoHelpers.js'
+import { checkTokenTermsAndAgreement } from '../../util/utils.js'
 import { showFullScreenSpinner } from '../modals/AirshipFullScreenSpinner.js'
 import { showError } from '../services/AirshipInstance.js'
 import { type Theme, type ThemeProps, cacheStyles, withTheme } from '../services/ThemeContext.js'
@@ -58,6 +59,8 @@ class WalletListCreateRowComponent extends React.PureComponent<Props & DispatchP
   createAndSelectToken = async () => {
     const { account, createTokenType, onPress, tokenCreated, wallets, defaultIsoFiat } = this.props
     const { currencyWallets } = account
+
+    if (!(await checkTokenTermsAndAgreement(wallets))) return
 
     try {
       if (createTokenType == null) throw new Error('Invalid Create Token Type')
