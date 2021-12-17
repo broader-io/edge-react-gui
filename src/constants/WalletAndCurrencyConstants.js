@@ -123,7 +123,8 @@ export const WALLET_TYPE_ORDER = [
   'wallet:telos',
   'wallet:wax',
   'wallet:fantom',
-  'wallet:hedera'
+  'wallet:hedera',
+  'wallet:polygon'
 ]
 
 // Put these in reverse order of preference
@@ -141,28 +142,29 @@ export const CURRENCY_PLUGIN_NAMES = {
   DOGE: 'dogecoin',
   EBST: 'eboost',
   EOS: 'eos',
-  ETH: 'ethereum',
   ETC: 'ethereumclassic',
+  ETH: 'ethereum',
   FIO: 'fio',
+  FIRO: 'zcoin',
   FTC: 'feathercoin',
   FTM: 'fantom',
   GRS: 'groestlcoin',
   HBAR: 'hedera',
   LTC: 'litecoin',
+  MATIC: 'polygon',
   QTUM: 'qtum',
   RBTC: 'rsk',
   RVN: 'ravencoin',
   SMART: 'smartcash',
   TESTBTC: 'bitcointestnet',
   TLOS: 'telos',
-  WAX: 'wax',
   UFO: 'ufo',
   VTC: 'vertcoin',
+  WAX: 'wax',
   XLM: 'stellar',
   XMR: 'monero',
   XRP: 'ripple',
   XTZ: 'tezos',
-  FIRO: 'zcoin',
   ZEC: 'zcash'
 }
 
@@ -454,6 +456,9 @@ export const SPECIAL_CURRENCY_INFO: {
     dummyPublicAddress: 'zs10xwzhkwm0ayzqn99q04l6hhyy76cu6mf6m8cu4xv4pdles7a3puh2cnv7w32qhzktrrsqpwy3n5',
     noChangeMiningFee: true,
     noMaxSpend: true
+  },
+  MATIC: {
+    isPrivateKeySweepable: true
   }
 }
 
@@ -489,28 +494,29 @@ export const WALLET_LIST_MENU: Array<{
   },
   {
     currencyCodes: [
-      'BTC',
       'BCH',
-      'DASH',
-      'FTC',
-      'FIRO',
-      'LTC',
-      'UFO',
-      'QTUM',
-      'VTC',
-      'BTG',
-      'DGB',
-      'SMART',
-      'GRS',
       'BSV',
+      'BTC',
+      'BTG',
+      'DASH',
+      'DGB',
+      'DOGE',
       'EBST',
       'EOS',
-      'WAX',
-      'TLOS',
-      'DOGE',
-      'RVN',
+      'FIRO',
+      'FTC',
+      'GRS',
+      'LTC',
+      'MATIC',
+      'QTUM',
       'RBTC',
+      'RVN',
+      'SMART',
       'TESTBTC',
+      'TLOS',
+      'UFO',
+      'VTC',
+      'WAX',
       'XMR',
       'ZEC'
     ],
