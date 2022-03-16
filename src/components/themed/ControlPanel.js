@@ -12,20 +12,21 @@ import { sprintf } from 'sprintf-js'
 
 import { deleteLocalAccount } from '../../actions/AccountActions.js'
 import { logoutRequest } from '../../actions/LoginActions.js'
-import { loginQrCodeScanned, qrCodeScanned } from '../../actions/ScanActions.js'
+import { parseScannedUri, qrCodeScanned } from '../../actions/ScanActions.js'
 import { selectWalletFromModal } from '../../actions/WalletActions'
 import edgeLogo from '../../assets/images/edgeLogo/Edge_logo_S.png'
 import { Fontello } from '../../assets/vector'
 import { EDGE_URL } from '../../constants/constantSettings.js'
-import { FIO_ADDRESS_LIST, FIO_REQUEST_LIST, SETTINGS_OVERVIEW_TAB, TERMS_OF_SERVICE, WALLET_CONNECT } from '../../constants/SceneKeys'
+import { FIO_ADDRESS_LIST, FIO_REQUEST_LIST, SETTINGS_OVERVIEW_TAB, TERMS_OF_SERVICE } from '../../constants/SceneKeys'
 import { SPECIAL_CURRENCY_INFO } from '../../constants/WalletAndCurrencyConstants.js'
 import s from '../../locales/strings'
-import { getDisplayDenomination } from '../../selectors/DenominationSelectors'
+import { getDisplayDenomination, getExchangeDenomination } from '../../selectors/DenominationSelectors'
 import { getSelectedWallet } from '../../selectors/WalletSelectors'
 import { useEffect, useState } from '../../types/reactHooks'
 import { useDispatch, useSelector } from '../../types/reactRedux'
 import { type NavigationProp, type ParamList, Actions } from '../../types/routerTypes.js'
 import { getCurrencyIcon } from '../../util/CurrencyInfoHelpers'
+import { getWalletFiat } from '../../util/CurrencyWalletHelpers.js'
 import { SceneWrapper } from '../common/SceneWrapper.js'
 import { ButtonsModal } from '../modals/ButtonsModal.js'
 import { ScanModal } from '../modals/ScanModal'
@@ -38,7 +39,9 @@ import { TitleText } from './TitleText'
 
 type Props = { navigation: NavigationProp<'controlPanel'> }
 
-const SweepableCurrencyCodes = Object.keys(SPECIAL_CURRENCY_INFO).filter(currencyCode => SPECIAL_CURRENCY_INFO[currencyCode].isPrivateKeySweepable)
+const SweepableCurrencyCodes = Object.keys(SPECIAL_CURRENCY_INFO)
+  .filter(pluginId => SPECIAL_CURRENCY_INFO[pluginId].isPrivateKeySweepable)
+  .map(pluginId => SPECIAL_CURRENCY_INFO[pluginId].chainCode)
 
 export function ControlPanel(props: Props) {
   const { navigation } = props
@@ -53,12 +56,18 @@ export function ControlPanel(props: Props) {
   const activeUsername = useSelector(state => state.core.account.username)
   const context = useSelector(state => state.core.context)
   const selectedCurrencyCode = useSelector(state => state.ui.wallets.selectedCurrencyCode)
+  const selectedWallet = useSelector(state => state.core.account.currencyWallets[state.ui.wallets.selectedWalletId])
   const guiWallet = useSelector(getSelectedWallet)
-  const currencyLogo = guiWallet != null ? getCurrencyIcon(guiWallet.currencyCode, selectedCurrencyCode).symbolImage : null
+  const metaTokens = guiWallet?.metaTokens ?? []
+  const contractAddress = metaTokens.find(token => token.currencyCode === selectedCurrencyCode)?.contractAddress
+  const currencyLogo = guiWallet != null ? getCurrencyIcon(selectedWallet.currencyInfo.pluginId, contractAddress).symbolImage : null
   const { name: currencyDenomName, multiplier: currencyDenomMult } = useSelector(state =>
-    guiWallet != null ? getDisplayDenomination(state, selectedCurrencyCode) : { name: '', multiplier: '1' }
+    guiWallet != null ? getDisplayDenomination(state, selectedWallet.currencyInfo.pluginId, selectedCurrencyCode) : { name: '', multiplier: '1' }
   )
-  const isoFiatCurrencyCode = guiWallet != null ? guiWallet.isoFiatCurrencyCode : null
+  const isoFiatCurrencyCode = selectedWallet != null ? getWalletFiat(selectedWallet).isoFiatCurrencyCode : null
+  const { multiplier: selectedCurrencyCodeExchangeMultiplier } = useSelector(state =>
+    guiWallet != null ? getExchangeDenomination(state, selectedWallet.currencyInfo.pluginId, selectedCurrencyCode) : { name: '', multiplier: '1' }
+  )
 
   /// ---- Local State ----
 
@@ -125,7 +134,7 @@ export function ControlPanel(props: Props) {
     Airship.show(bridge => <ScanModal bridge={bridge} title={s.strings.scan_qr_label} isAlbum={false} />)
       .then((result: string | void) => {
         if (result) {
-          dispatch(loginQrCodeScanned(result))
+          dispatch(parseScannedUri(result))
         }
       })
       .catch(showError)
@@ -200,7 +209,7 @@ export function ControlPanel(props: Props) {
       title: s.strings.drawer_fio_requests
     },
     {
-      pressHandler: () => handleGoToScene(WALLET_CONNECT),
+      pressHandler: () => handleGoToScene('wcConnections'),
       iconName: 'cp-wallet-connect',
       title: s.strings.wc_walletconnect_title
     },
@@ -249,6 +258,7 @@ export function ControlPanel(props: Props) {
                     isoFiatCurrencyCode={isoFiatCurrencyCode}
                     autoPrecision
                     appendFiatCurrencyCode
+                    cryptoExchangeMultiplier={selectedCurrencyCodeExchangeMultiplier}
                   />
                 </TitleText>
               </View>
@@ -304,7 +314,7 @@ export function ControlPanel(props: Props) {
                 <View style={styles.rowIconContainer}>
                   <Fontello name={rowData.iconName} style={styles.icon} size={theme.rem(1.5)} color={theme.iconTappable} />
                 </View>
-                <View style={[styles.rowBodyContainer, styles.navBodyContainer]}>
+                <View style={styles.rowBodyContainer}>
                   <TitleText style={styles.text}>{rowData.title}</TitleText>
                 </View>
               </TouchableOpacity>
@@ -388,11 +398,8 @@ const getStyles = cacheStyles((theme: Theme) => ({
     justifyContent: 'flex-start',
     alignItems: 'center',
     flexGrow: 1,
+    flexShrink: 1,
     marginRight: theme.rem(1)
-  },
-  navBodyContainer: {
-    flexGrow: 0,
-    flexShrink: 1
   },
   // Animation
   dropContainer: {

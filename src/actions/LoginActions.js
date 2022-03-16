@@ -7,7 +7,7 @@ import { sprintf } from 'sprintf-js'
 
 import { Airship, showError } from '../components/services/AirshipInstance.js'
 import { EDGE, LOGIN, SECURITY_ALERTS_SCENE } from '../constants/SceneKeys.js'
-import { CURRENCY_PLUGIN_NAMES, USD_FIAT } from '../constants/WalletAndCurrencyConstants.js'
+import { USD_FIAT } from '../constants/WalletAndCurrencyConstants.js'
 import s from '../locales/strings.js'
 import {
   getLocalSettings,
@@ -15,10 +15,7 @@ import {
   LOCAL_ACCOUNT_DEFAULTS,
   LOCAL_ACCOUNT_TYPES,
   PASSWORD_RECOVERY_REMINDERS_SHOWN,
-  setLocalSettings,
-  setSyncedSettings,
-  SYNCED_ACCOUNT_DEFAULTS,
-  SYNCED_ACCOUNT_TYPES
+  setLocalSettings
 } from '../modules/Core/Account/settings.js'
 import { initialState as passwordReminderInitialState } from '../reducers/PasswordReminderReducer.js'
 import { type AccountInitPayload } from '../reducers/scenes/SettingsReducer.js'
@@ -76,10 +73,9 @@ export const initializeAccount = (account: EdgeAccount, touchIdInfo: GuiTouchIdI
     countryCode: '',
     currencyCode: '',
     customTokens: [],
-    customTokensSettings: [],
     defaultFiat: '',
     defaultIsoFiat: '',
-    denominationKeys: [],
+    denominationSettings: {},
     developerModeOn: false,
     isAccountBalanceVisible: false,
     mostRecentWallets: [],
@@ -118,31 +114,14 @@ export const initializeAccount = (account: EdgeAccount, touchIdInfo: GuiTouchIdI
     accountInitObject.activeWalletIds = activeWalletIds
     accountInitObject.archivedWalletIds = archivedWalletIds
 
-    const loadedSyncedSettings = await getSyncedSettings(account)
-    const syncedSettings = { ...loadedSyncedSettings } // will prevent mergeSettings trying to find prop of undefined
-    const mergedSyncedSettings = mergeSettings(syncedSettings, SYNCED_ACCOUNT_DEFAULTS, SYNCED_ACCOUNT_TYPES, account)
-    if (mergedSyncedSettings.isOverwriteNeeded) {
-      setSyncedSettings(account, { ...mergedSyncedSettings.finalSettings })
-    }
-    accountInitObject = { ...accountInitObject, ...mergedSyncedSettings.finalSettings }
+    const syncedSettings = await getSyncedSettings(account)
+    accountInitObject = { ...accountInitObject, ...syncedSettings }
 
-    if (accountInitObject.customTokens) {
-      accountInitObject.customTokens.forEach(token => {
-        accountInitObject.customTokensSettings.push(token)
-        // this second dispatch will be redundant if we set 'denomination' property upon customToken creation
-        accountInitObject.denominationKeys.push({ currencyCode: token.currencyCode, denominationKey: token.multiplier })
-      })
-    }
-    for (const key of Object.keys(accountInitObject)) {
-      const row: any = accountInitObject[key]
-      if (row == null || typeof row.denomination !== 'string') continue
-      accountInitObject.denominationKeys.push({ currencyCode: key, denominationKey: row.denomination })
-    }
     const loadedLocalSettings = await getLocalSettings(account)
     const localSettings = { ...loadedLocalSettings }
     const mergedLocalSettings = mergeSettings(localSettings, LOCAL_ACCOUNT_DEFAULTS, LOCAL_ACCOUNT_TYPES)
-    if (mergedLocalSettings.isOverwriteNeeded) {
-      setLocalSettings(account, { ...mergedSyncedSettings.finalSettings })
+    if (mergedLocalSettings.isOverwriteNeeded && syncedSettings != null) {
+      setLocalSettings(account, syncedSettings)
     }
     accountInitObject = { ...accountInitObject, ...mergedLocalSettings.finalSettings }
 
@@ -152,6 +131,34 @@ export const initializeAccount = (account: EdgeAccount, touchIdInfo: GuiTouchIdI
       accountInitObject.defaultFiat = defaultFiat
       accountInitObject.defaultIsoFiat = 'iso:' + defaultFiat
     }
+
+    const defaultDenominationSettings = state.ui.settings.denominationSettings
+    const syncedDenominationSettings = syncedSettings?.denominationSettings ?? {}
+    const mergedDenominationSettings = {}
+
+    for (const plugin of Object.keys(defaultDenominationSettings)) {
+      mergedDenominationSettings[plugin] = {}
+      for (const code of Object.keys(defaultDenominationSettings[plugin])) {
+        mergedDenominationSettings[plugin][code] = {
+          ...defaultDenominationSettings[plugin][code],
+          ...(syncedDenominationSettings?.[plugin]?.[code] ?? {})
+        }
+      }
+    }
+    accountInitObject.denominationSettings = { ...mergedDenominationSettings }
+
+    accountInitObject.customTokens.forEach(token => {
+      if (token.walletType != null) {
+        const pluginId = token.walletType.replace('wallet:', '')
+        const denom = token.denominations.find(denom => denom.name === token.currencyCode)
+        if (denom != null) {
+          if (accountInitObject.denominationSettings[pluginId] == null) {
+            accountInitObject.denominationSettings[pluginId] = {}
+          }
+          accountInitObject.denominationSettings[pluginId][token.currencyCode] = denom
+        }
+      }
+    })
 
     dispatch({
       type: 'ACCOUNT_INIT_COMPLETE',
@@ -222,25 +229,6 @@ export const mergeSettings = (
       finalSettings[key] = defaults[key]
     } else {
       finalSettings[key] = loadedSettings[key]
-    }
-
-    if (account && loadedSettings[key] != null) {
-      const currencyName = CURRENCY_PLUGIN_NAMES[key]
-      const doesHaveDenominations = loadedSettings[key].denominations
-      const doesHavePlugin = account.currencyConfig[currencyName]
-      // if there are settings for this key
-      // and currency (not token) and has a plugin name
-      if (loadedSettings && loadedSettings[key] && doesHaveDenominations && doesHavePlugin && currencyName) {
-        // for each currency info (each native currency)
-        const pluginDenominations = account.currencyConfig[currencyName].currencyInfo.denominations // get denominations for that plugin
-        const settingDenominationIndex = pluginDenominations.findIndex(pluginDenom => pluginDenom.multiplier === loadedSettings[key].denomination) // find settings denom in plugin denoms
-        if (settingDenominationIndex === -1) {
-          // setting denomination is not present in plugin (and on wallet)
-          finalSettings[key].denomination = pluginDenominations[0].multiplier // grab the first denom multiplier from plugin
-          console.warn(`${key} denomination ${loadedSettings[key].denomination} invalid, overwriting with plugin denom`)
-          isOverwriteNeeded = true // make sure synced settings get overwritten
-        }
-      }
     }
   }
 

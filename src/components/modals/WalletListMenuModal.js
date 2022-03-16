@@ -9,7 +9,7 @@ import AntDesignIcon from 'react-native-vector-icons/AntDesign'
 import { sprintf } from 'sprintf-js'
 
 import { type WalletListMenuKey, walletListMenuAction } from '../../actions/WalletListMenuActions.js'
-import { WALLET_LIST_MENU } from '../../constants/WalletAndCurrencyConstants.js'
+import { getSpecialCurrencyInfo, WALLET_LIST_MENU } from '../../constants/WalletAndCurrencyConstants.js'
 import s from '../../locales/strings.js'
 import { useEffect, useState } from '../../types/reactHooks.js'
 import { useDispatch, useSelector } from '../../types/reactRedux.js'
@@ -34,13 +34,13 @@ type Props = {
 
 const icons = {
   delete: 'warning',
+  rawDelete: 'warning',
   exportWalletTransactions: 'export',
   getRawKeys: 'lock',
   getSeed: 'key',
   manageTokens: 'plus',
   rename: 'edit',
   resync: 'sync',
-  split: 'arrowsalt',
   viewXPub: 'eye'
 }
 
@@ -54,7 +54,10 @@ const getWalletOptions = async (params: {
   const { walletId, currencyCode, isToken, account } = params
 
   if (!currencyCode) {
-    return [{ label: s.strings.string_get_raw_keys, value: 'getRawKeys' }]
+    return [
+      { label: s.strings.string_get_raw_keys, value: 'getRawKeys' },
+      { label: s.strings.string_archive_wallet, value: 'rawDelete' }
+    ]
   }
 
   if (isToken) {
@@ -74,11 +77,11 @@ const getWalletOptions = async (params: {
 
   const splittable = await account.listSplittableWalletTypes(walletId)
 
+  const currencyInfos = getCurrencyInfos(account)
   for (const splitWalletType of splittable) {
-    if (splitWalletType === 'wallet:bitcoingold') continue // TODO: Remove after fixing BTG splitting
-    const info = getCurrencyInfos(account).find(({ walletType }) => walletType === splitWalletType)
-
-    result.push({ label: sprintf(s.strings.string_split_wallet, info?.displayName), value: 'split' })
+    const info = currencyInfos.find(({ walletType }) => walletType === splitWalletType)
+    if (info == null || getSpecialCurrencyInfo(info.pluginId).isSplittingDisabled) continue
+    result.push({ label: sprintf(s.strings.string_split_wallet, info.displayName), value: `split${info.currencyCode}` })
   }
 
   for (const option of WALLET_LIST_MENU) {
@@ -129,7 +132,7 @@ export function WalletListMenuModal(props: Props) {
       {options.map((option: Option) => (
         <TouchableOpacity key={option.value} onPress={() => optionAction(option.value)} style={styles.optionRow}>
           <AntDesignIcon
-            name={icons[option.value]}
+            name={icons[option.value] ?? 'arrowsalt'} // for split keys like splitBCH, splitETH, etc.
             size={theme.rem(1)}
             style={option.value === 'delete' ? [styles.optionIcon, styles.warningColor] : styles.optionIcon}
           />

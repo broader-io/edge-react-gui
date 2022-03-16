@@ -74,6 +74,7 @@ import {
   FIO_DOMAIN_REGISTER_SELECT_WALLET,
   FIO_DOMAIN_SETTINGS,
   FIO_NAME_CONFIRM,
+  FIO_REQUEST_APPROVED,
   FIO_REQUEST_CONFIRMATION,
   FIO_REQUEST_LIST,
   FIO_SENT_REQUEST_DETAILS,
@@ -95,6 +96,8 @@ import {
   SETTINGS_OVERVIEW,
   SETTINGS_OVERVIEW_TAB,
   SPENDING_LIMITS,
+  STAKING_CHANGE,
+  STAKING_OVERVIEW,
   TERMS_OF_SERVICE,
   TRANSACTION_DETAILS,
   TRANSACTION_LIST,
@@ -145,6 +148,8 @@ import { SecurityAlertsScene } from './scenes/SecurityAlertsScene.js'
 import { SendScene } from './scenes/SendScene.js'
 import { SettingsScene } from './scenes/SettingsScene.js'
 import { SpendingLimitsScene } from './scenes/SpendingLimitsScene.js'
+import { StakingChangeScene } from './scenes/StakingChangeScene'
+import { StakingOverviewScene } from './scenes/StakingOverviewScene.js'
 import { TermsOfServiceComponent } from './scenes/TermsOfServiceScene.js'
 import { TransactionDetailsScene } from './scenes/TransactionDetailsScene.js'
 import { TransactionList } from './scenes/TransactionListScene.js'
@@ -341,6 +346,22 @@ export class MainComponent extends React.Component<Props> {
                 }}
                 navTransparent
                 renderTitle={<HeaderTitle title=" " />}
+                renderLeftButton={<BackButton onPress={this.handleBack} />}
+                renderRightButton={<SideMenuButton />}
+              />
+
+              <Scene
+                key={STAKING_OVERVIEW}
+                navTransparent
+                component={ifLoggedIn(StakingOverviewScene)}
+                renderLeftButton={<BackButton onPress={this.handleBack} />}
+                renderRightButton={<SideMenuButton />}
+              />
+
+              <Scene
+                key={STAKING_CHANGE}
+                navTransparent
+                component={ifLoggedIn(StakingChangeScene)}
                 renderLeftButton={<BackButton onPress={this.handleBack} />}
                 renderRightButton={<SideMenuButton />}
               />
@@ -793,6 +814,16 @@ export class MainComponent extends React.Component<Props> {
               renderLeftButton={<BackButton onPress={this.handleBack} />}
               renderRightButton={<SideMenuButton />}
               onLeft={Actions.pop}
+            />
+            <Scene
+              key={FIO_REQUEST_APPROVED}
+              component={withNavigation(ifLoggedIn(TransactionDetailsScene))}
+              navTransparent
+              onEnter={() => this.props.requestPermission('contacts')}
+              clone
+              renderTitle={props => <TransactionDetailsTitle edgeTransaction={props.route.params.edgeTransaction} />}
+              renderLeftButton={<BackButton onPress={this.handleBack} />}
+              renderRightButton={<SideMenuButton />}
             />
           </Stack>
 

@@ -2,9 +2,8 @@
 
 import type { EdgeTransaction } from 'edge-core-js'
 import React, { PureComponent } from 'react'
-import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native'
+import { Linking, Platform, ScrollView, View } from 'react-native'
 import { type AirshipBridge } from 'react-native-airship'
-import { getDeviceName } from 'react-native-device-info'
 import SafariView from 'react-native-safari-view'
 
 import s from '../../locales/strings.js'
@@ -32,27 +31,9 @@ type OwnProps = {
   url?: string
 }
 
-type State = {
-  deviceName: string
-}
-
 type Props = OwnProps & ThemeProps
 
-class TransactionAdvanceDetailsComponent extends PureComponent<Props, State> {
-  constructor(props: Props) {
-    super(props)
-
-    this.state = {
-      deviceName: ''
-    }
-  }
-
-  componentDidMount() {
-    getDeviceName().then(deviceName => {
-      this.setState({ deviceName })
-    })
-  }
-
+class TransactionAdvanceDetailsComponent extends PureComponent<Props> {
   getRecipientAddress = () => (this.props.transaction.spendTargets ? this.props.transaction.spendTargets[0].publicAddress : '')
 
   openUrl = () => {
@@ -93,37 +74,30 @@ class TransactionAdvanceDetailsComponent extends PureComponent<Props, State> {
     })
   }
 
-  renderFeeOptions(styles: StyleSheet) {
+  renderFeeOptions(): string {
     const { networkFeeOption, requestedCustomFee } = this.props.transaction
 
     if (networkFeeOption === 'custom') {
-      return this.renderFees(styles, s.strings.mining_fee_custom_label_choice, requestedCustomFee)
+      return `${s.strings.mining_fee_custom_label_choice}\n${this.renderFees(requestedCustomFee)}`
     }
-    return <EdgeText style={styles.text}>{networkFeeOption != null ? feeString[networkFeeOption] : s.strings.mining_fee_standard_label_choice}</EdgeText>
+
+    return networkFeeOption != null ? feeString[networkFeeOption] : s.strings.mining_fee_standard_label_choice
   }
 
-  renderFees(styles: StyleSheet, title: string, fees: Object = {}) {
-    const feeRows = []
+  renderFees(fees: Object = {}): string {
+    let feeValueText = ''
+
     for (const feeKey of Object.keys(fees)) {
-      const feeString = localizedFeeText[feeKey] ?? feeKey
-      feeRows.push(
-        <View key={feeKey} style={styles.feesRow}>
-          <EdgeText style={styles.feesRowText}>{feeString + ' '}</EdgeText>
-          <EdgeText style={styles.feesRowText}>{fees[feeKey]}</EdgeText>
-        </View>
-      )
+      const feeFullString = `${localizedFeeText[feeKey] ?? feeKey} ${fees[feeKey]}`
+      feeValueText = feeValueText === '' ? feeValueText + feeFullString : feeValueText + `\n${feeFullString}`
     }
-    return (
-      <View style={styles.feesContainer}>
-        <EdgeText style={styles.feesRowText}>{title + ':'}</EdgeText>
-        <View style={styles.feesBodyContainer}>{feeRows}</View>
-      </View>
-    )
+
+    return feeValueText
   }
 
   render() {
     const { bridge, theme, url } = this.props
-    const { feeRateUsed, networkFeeOption, signedTx, txid, txSecret } = this.props.transaction
+    const { feeRateUsed, networkFeeOption, signedTx, txid, txSecret, deviceDescription } = this.props.transaction
     const recipientAddress = this.getRecipientAddress()
     const styles = getStyles(theme)
 
@@ -143,12 +117,10 @@ class TransactionAdvanceDetailsComponent extends PureComponent<Props, State> {
                 onPress={this.openUrl}
               />
             )}
-            {(networkFeeOption != null || feeRateUsed != null) && (
-              <Tile type="static" title={s.strings.transaction_details_advance_details_fee_info}>
-                {networkFeeOption != null ? this.renderFeeOptions(styles) : null}
-                {feeRateUsed != null ? this.renderFees(styles, s.strings.transaction_details_advance_details_fee_used, feeRateUsed) : null}
-              </Tile>
+            {networkFeeOption != null && (
+              <Tile type="static" title={s.strings.transaction_details_advance_details_fee_setting} body={this.renderFeeOptions()} />
             )}
+            {feeRateUsed != null && <Tile type="static" title={s.strings.transaction_details_advance_details_fee_used} body={this.renderFees(feeRateUsed)} />}
             {txSecret != null && <Tile type="copy" title={s.strings.transaction_details_advance_details_txSecret} body={txSecret} />}
             {txSecret != null && recipientAddress !== '' && txid !== '' && (
               <Tile
@@ -159,10 +131,10 @@ class TransactionAdvanceDetailsComponent extends PureComponent<Props, State> {
               />
             )}
             {signedTx != null && signedTx !== '' ? (
-              <Tile type="copy" title={s.strings.transaction_details_advance_details_raw_txbytes} body={signedTx} />
+              <Tile type="copy" title={s.strings.transaction_details_advance_details_raw_txbytes} body={signedTx} maximumHeight="small" />
             ) : null}
 
-            <Tile type="static" title={s.strings.transaction_details_advance_details_device} body={this.state.deviceName} />
+            {deviceDescription != null && <Tile type="static" title={s.strings.transaction_details_advance_details_device} body={deviceDescription} />}
           </ScrollView>
         </View>
         <ModalCloseArrow onPress={this.handleCancel} />
@@ -188,25 +160,6 @@ const getStyles = cacheStyles((theme: Theme) => ({
   },
   body: {
     maxHeight: theme.rem(20)
-  },
-  text: {
-    color: theme.primaryText,
-    fontSize: theme.rem(1)
-  },
-  feesContainer: {
-    width: '100%',
-    flexDirection: 'row'
-  },
-  feesBodyContainer: {
-    flexDirection: 'column',
-    marginLeft: theme.rem(0.25)
-  },
-  feesRow: {
-    flexDirection: 'row'
-  },
-  feesRowText: {
-    color: theme.primaryText,
-    fontSize: theme.rem(1)
   }
 }))
 

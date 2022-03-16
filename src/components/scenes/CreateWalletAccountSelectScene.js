@@ -18,7 +18,7 @@ import { PrimaryButton } from '../../modules/UI/components/Buttons/PrimaryButton
 import { FormattedText as Text } from '../../modules/UI/components/FormattedText/FormattedText.ui.js'
 import { Gradient } from '../../modules/UI/components/Gradient/Gradient.ui'
 import { SafeAreaViewComponent as SafeAreaView } from '../../modules/UI/components/SafeAreaView/SafeAreaView.ui.js'
-import { getDefaultDenomination } from '../../selectors/DenominationSelectors.js'
+import { getExchangeDenomination } from '../../selectors/DenominationSelectors.js'
 import { THEME } from '../../theme/variables/airbitz.js'
 import { connect } from '../../types/reactRedux.js'
 import { type RouteProp } from '../../types/routerTypes.js'
@@ -47,7 +47,6 @@ type StateProps = {
   amount: string,
   supportedCurrencies: { [currencyCode: string]: boolean },
   activationCost: string,
-  isCreatingWallet: boolean,
   paymentDenominationSymbol: string,
   existingCoreWallet?: EdgeCurrencyWallet,
   walletAccountActivationQuoteError: string,
@@ -55,14 +54,8 @@ type StateProps = {
 }
 
 type DispatchProps = {
-  createAccountBasedWallet: (
-    walletName: string,
-    walletType: string,
-    fiatCurrencyCode: string,
-    popScene: boolean,
-    selectWallet: boolean
-  ) => Promise<EdgeCurrencyWallet>,
-  fetchAccountActivationInfo: (currencyCode: string) => void,
+  createAccountBasedWallet: (walletName: string, walletType: string, fiatCurrencyCode: string) => Promise<EdgeCurrencyWallet>,
+  fetchAccountActivationInfo: (walletType: string) => void,
   createAccountTransaction: (createdWalletId: string, accountName: string, paymentWalletId: string) => void,
   fetchWalletAccountActivationPaymentInfo: (paymentInfo: AccountPaymentParams, createdCoreWallet: EdgeCurrencyWallet) => void,
   setWalletAccountActivationQuoteError: (message: string) => void
@@ -71,6 +64,7 @@ type DispatchProps = {
 type Props = OwnProps & DispatchProps & StateProps
 
 type State = {
+  isCreatingWallet: boolean,
   walletName: string,
   walletId: string,
   error: string,
@@ -82,26 +76,30 @@ class CreateWalletAccountSelect extends React.Component<Props, State> {
     super(props)
     const { createAccountBasedWallet, route } = this.props
     const { selectedFiat, selectedWalletType, accountName } = route.params
-    let createdWallet
+    let createdWallet: Promise<EdgeCurrencyWallet>
     if (props.existingCoreWallet != null) {
       createdWallet = this.renameAndReturnWallet(props.existingCoreWallet)
     } else {
-      createdWallet = createAccountBasedWallet(accountName, selectedWalletType.walletType, fixFiatCurrencyCode(selectedFiat.value), false, false)
+      createdWallet = createAccountBasedWallet(accountName, selectedWalletType.walletType, fixFiatCurrencyCode(selectedFiat.value)).then(wallet => {
+        this.setState({ isCreatingWallet: false })
+        return wallet
+      })
     }
     this.state = {
+      isCreatingWallet: true,
       error: '',
       walletId: '',
       walletName: '',
       createdWallet
     }
-    const currencyCode = selectedWalletType.currencyCode
-    props.fetchAccountActivationInfo(currencyCode)
+    props.fetchAccountActivationInfo(selectedWalletType.walletType)
   }
 
   renameAndReturnWallet = async (wallet: EdgeCurrencyWallet) => {
     const { route } = this.props
     const { accountName } = route.params
     await wallet.renameWallet(accountName)
+    this.setState({ isCreatingWallet: false })
     return wallet
   }
 
@@ -185,8 +183,8 @@ class CreateWalletAccountSelect extends React.Component<Props, State> {
   }
 
   renderPaymentReview = () => {
-    const { wallets, paymentCurrencyCode, isCreatingWallet, amount, activationCost, paymentDenominationSymbol, route } = this.props
-    const { walletId, createdWallet } = this.state
+    const { wallets, paymentCurrencyCode, amount, activationCost, paymentDenominationSymbol, route } = this.props
+    const { walletId, createdWallet, isCreatingWallet } = this.state
     const { accountName, selectedWalletType, selectedFiat } = route.params
 
     const wallet = wallets[walletId]
@@ -250,7 +248,7 @@ class CreateWalletAccountSelect extends React.Component<Props, State> {
     const { selectedWalletType } = route.params
     const { walletId } = this.state
     const walletTypeValue = selectedWalletType.walletType.replace('wallet:', '')
-    const { symbolImage } = getCurrencyIcon(currencyConfigs[walletTypeValue].currencyInfo.currencyCode)
+    const { symbolImage } = getCurrencyIcon(currencyConfigs[walletTypeValue].currencyInfo.pluginId)
     const instructionSyntax = sprintf(
       s.strings.create_wallet_account_select_instructions_with_cost,
       selectedWalletType.currencyCode,
@@ -408,9 +406,9 @@ export const CreateWalletAccountSelectScene = connect<StateProps, DispatchProps,
     const walletAccountActivationPaymentInfo = state.ui.scenes.createWallet.walletAccountActivationPaymentInfo
     const { supportedCurrencies, activationCost } = handleActivationInfo
     const { currencyCode, amount } = walletAccountActivationPaymentInfo
-    const isCreatingWallet = state.ui.scenes.createWallet.isCreatingWallet
     const existingCoreWallet = existingWalletId ? currencyWallets[existingWalletId] : undefined
-    const paymentDenomination = currencyCode ? getDefaultDenomination(state, currencyCode) : {}
+    const paymentDenomination =
+      currencyCode != null && existingCoreWallet != null ? getExchangeDenomination(state, existingCoreWallet.currencyInfo.pluginId, currencyCode) : {}
 
     let paymentDenominationSymbol
     if (paymentDenomination) {
@@ -425,7 +423,6 @@ export const CreateWalletAccountSelectScene = connect<StateProps, DispatchProps,
       supportedCurrencies,
       activationCost,
       wallets,
-      isCreatingWallet,
       paymentDenominationSymbol,
       existingCoreWallet,
       walletAccountActivationQuoteError,
@@ -436,14 +433,14 @@ export const CreateWalletAccountSelectScene = connect<StateProps, DispatchProps,
     createAccountTransaction(createdWalletId: string, accountName: string, paymentWalletId: string) {
       dispatch(createAccountTransaction(createdWalletId, accountName, paymentWalletId))
     },
-    fetchAccountActivationInfo(currencyCode: string) {
-      dispatch(fetchAccountActivationInfo(currencyCode))
+    fetchAccountActivationInfo(walletType: string) {
+      dispatch(fetchAccountActivationInfo(walletType))
     },
     fetchWalletAccountActivationPaymentInfo(paymentInfo: AccountPaymentParams, createdCoreWallet: EdgeCurrencyWallet) {
       dispatch(fetchWalletAccountActivationPaymentInfo(paymentInfo, createdCoreWallet))
     },
-    async createAccountBasedWallet(walletName: string, walletType: string, fiatCurrencyCode: string, popScene: boolean, selectWallet: boolean) {
-      return await dispatch(createCurrencyWallet(walletName, walletType, fiatCurrencyCode, popScene, selectWallet))
+    async createAccountBasedWallet(walletName: string, walletType: string, fiatCurrencyCode: string) {
+      return await dispatch(createCurrencyWallet(walletName, walletType, fiatCurrencyCode))
     },
     setWalletAccountActivationQuoteError(message) {
       dispatch({ type: 'WALLET_ACCOUNT_ACTIVATION_ESTIMATE_ERROR', data: message })

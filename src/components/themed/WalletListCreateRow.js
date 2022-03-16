@@ -1,13 +1,15 @@
 // @flow
 
+import type { Disklet } from 'disklet'
 import { type EdgeAccount, type EdgeCurrencyWallet } from 'edge-core-js'
 import * as React from 'react'
 import { View } from 'react-native'
 import FastImage from 'react-native-fast-image'
 
 import { createCurrencyWallet } from '../../actions/CreateWalletActions'
-import { refreshWallet } from '../../actions/WalletActions.js'
-import { DEFAULT_STARTER_WALLET_NAMES } from '../../constants/WalletAndCurrencyConstants.js'
+import { approveTokenTerms } from '../../actions/TokenTermsActions.js'
+import { refreshWallet, selectWallet } from '../../actions/WalletActions.js'
+import { getPluginId, SPECIAL_CURRENCY_INFO } from '../../constants/WalletAndCurrencyConstants.js'
 import s from '../../locales/strings.js'
 import { setEnabledTokens } from '../../modules/Core/Wallets/EnabledTokens.js'
 import { connect } from '../../types/reactRedux.js'
@@ -28,6 +30,7 @@ type OwnProps = {
 type StateProps = {
   account: EdgeAccount,
   defaultIsoFiat: string,
+  disklet: Disklet,
   wallets: { [string]: GuiWallet }
 }
 
@@ -44,10 +47,10 @@ class WalletListCreateRowComponent extends React.PureComponent<Props & DispatchP
     const { createWalletType, onPress, defaultIsoFiat } = this.props
     try {
       if (createWalletType == null) throw new Error('Invalid Create Wallet Type')
-      const { currencyCode, walletType } = createWalletType
+      const { walletType } = createWalletType
       const wallet = await showFullScreenSpinner(
         s.strings.wallet_list_modal_creating_wallet,
-        this.props.createWallet(DEFAULT_STARTER_WALLET_NAMES[currencyCode], walletType, defaultIsoFiat)
+        this.props.createWallet(SPECIAL_CURRENCY_INFO[getPluginId(walletType)].initWalletName, walletType, defaultIsoFiat)
       )
       onPress(wallet.id, wallet.currencyInfo.currencyCode)
     } catch (error) {
@@ -56,13 +59,14 @@ class WalletListCreateRowComponent extends React.PureComponent<Props & DispatchP
   }
 
   createAndSelectToken = async () => {
-    const { account, createTokenType, onPress, tokenCreated, wallets, defaultIsoFiat } = this.props
+    const { account, createTokenType, defaultIsoFiat, disklet, onPress, tokenCreated, wallets } = this.props
     const { currencyWallets } = account
 
     try {
       if (createTokenType == null) throw new Error('Invalid Create Token Type')
       const { currencyCode, parentCurrencyCode } = createTokenType
-
+      // Show the user the token terms modal only once
+      await approveTokenTerms(disklet, parentCurrencyCode)
       // Find existing EdgeCurrencyWallet
       let wallet
       for (const walletId of Object.keys(currencyWallets)) {
@@ -95,9 +99,9 @@ class WalletListCreateRowComponent extends React.PureComponent<Props & DispatchP
 
   handlePress = () => {
     if (this.props.createWalletType) {
-      this.createAndSelectWallet()
+      this.createAndSelectWallet().catch(showError)
     } else {
-      this.createAndSelectToken()
+      this.createAndSelectToken().catch(showError)
     }
   }
 
@@ -161,6 +165,7 @@ export const WalletListCreateRow = connect<StateProps, DispatchProps, OwnProps>(
   state => ({
     wallets: state.ui.wallets.byId,
     account: state.core.account,
+    disklet: state.core.disklet,
     defaultIsoFiat: state.ui.settings.defaultIsoFiat
   }),
   dispatch => ({
@@ -172,7 +177,9 @@ export const WalletListCreateRow = connect<StateProps, DispatchProps, OwnProps>(
       dispatch(refreshWallet(walletId))
     },
     async createWallet(walletName: string, walletType: string, fiatCurrencyCode: string) {
-      return dispatch(createCurrencyWallet(walletName, walletType, fiatCurrencyCode, false, true))
+      const wallet = await dispatch(createCurrencyWallet(walletName, walletType, fiatCurrencyCode))
+      dispatch(selectWallet(wallet.id, wallet.currencyInfo.currencyCode))
+      return wallet
     }
   })
 )(withTheme(WalletListCreateRowComponent))

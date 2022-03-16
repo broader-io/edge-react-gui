@@ -4,7 +4,7 @@ import { type EdgeCurrencyConfig } from 'edge-core-js'
 import * as React from 'react'
 import { View } from 'react-native'
 
-import { CURRENCY_PLUGIN_NAMES, FIO_ADDRESS_DELIMITER } from '../../constants/WalletAndCurrencyConstants.js'
+import { FIO_ADDRESS_DELIMITER } from '../../constants/WalletAndCurrencyConstants.js'
 import s from '../../locales/strings.js'
 import { FioActionSubmit } from '../../modules/FioAddress/components/FioActionSubmit'
 import { connect } from '../../types/reactRedux.js'
@@ -109,11 +109,10 @@ class FioNameConfirm extends React.PureComponent<Props> {
     } else {
       try {
         if (this.isFioAddress()) {
-          const { expiration } = await paymentWallet.otherMethods.fioAction('registerFioAddress', { fioAddress: fioName, ownerPublicKey })
+          await paymentWallet.otherMethods.fioAction('registerFioAddress', { fioAddress: fioName, ownerPublicKey })
           window.requestAnimationFrame(() =>
             navigation.navigate('fioAddressRegisterSuccess', {
-              fioName,
-              expiration
+              fioName
             })
           )
         } else {
@@ -167,7 +166,7 @@ const getStyles = cacheStyles(() => ({
 
 export const FioNameConfirmScene = connect<StateProps, {}, OwnProps>(
   state => ({
-    fioPlugin: state.core.account.currencyConfig[CURRENCY_PLUGIN_NAMES.FIO],
+    fioPlugin: state.core.account.currencyConfig.fio,
     isConnected: state.network.isConnected
   }),
   dispatch => ({})

@@ -3,10 +3,10 @@
 import { type Reducer } from 'redux'
 
 import { type Action } from '../types/reduxTypes.js'
-import { type GuiCurrencyInfo, type GuiWallet } from '../types/types.js'
+import { type GuiCurrencyInfo } from '../types/types.js'
 
 export type CryptoExchangeState = {
-  fromWallet: GuiWallet | null,
+  fromWalletId: string | null,
   fromCurrencyCode: string | null,
   fromNativeAmount: string,
   fromDisplayAmount: string,
@@ -15,7 +15,7 @@ export type CryptoExchangeState = {
   fromCurrencyIconDark: string | null,
   fromBalanceMessage: string,
 
-  toWallet: GuiWallet | null,
+  toWalletId: string | null,
   toCurrencyCode: string | null,
   toNativeAmount: string,
   toDisplayAmount: string,
@@ -31,8 +31,7 @@ export type CryptoExchangeState = {
   // Activity flags:
   forceUpdateGuiCounter: number,
   shiftPendingTransaction: boolean,
-  calculatingMax: boolean,
-  creatingWallet: boolean
+  calculatingMax: boolean
 }
 
 const dummyCurrencyInfo: GuiCurrencyInfo = {
@@ -49,7 +48,7 @@ const dummyCurrencyInfo: GuiCurrencyInfo = {
 }
 
 const initialState: CryptoExchangeState = {
-  fromWallet: null,
+  fromWalletId: null,
   fromCurrencyCode: null,
   fromNativeAmount: '0',
   fromDisplayAmount: '0',
@@ -58,7 +57,7 @@ const initialState: CryptoExchangeState = {
   fromCurrencyIconDark: null,
   fromBalanceMessage: '',
 
-  toWallet: null,
+  toWalletId: null,
   toCurrencyCode: null,
   toNativeAmount: '0',
   toDisplayAmount: '0',
@@ -71,27 +70,16 @@ const initialState: CryptoExchangeState = {
   genericShapeShiftError: null,
   forceUpdateGuiCounter: 0,
   shiftPendingTransaction: false,
-  calculatingMax: false,
-  creatingWallet: false
+  calculatingMax: false
 }
 
 function cryptoExchangeInner(state = initialState, action: Action): CryptoExchangeState {
   let forceUpdateGuiCounter
   switch (action.type) {
-    case 'UI/WALLETS/CREATE_WALLET_START': {
-      return { ...state, creatingWallet: true }
-    }
-    case 'UI/WALLETS/CREATE_WALLET_SUCCESS': {
-      return { ...state, creatingWallet: false }
-    }
-    case 'UI/WALLETS/CREATE_WALLET_FAILURE': {
-      return { ...state, creatingWallet: false }
-    }
-
     case 'SELECT_FROM_WALLET_CRYPTO_EXCHANGE': {
       return {
         ...state,
-        fromWallet: action.data.wallet,
+        fromWalletId: action.data.walletId,
         fromWalletPrimaryInfo: action.data.primaryInfo,
         fromCurrencyCode: action.data.currencyCode,
         fromCurrencyIcon: action.data.symbolImage,
@@ -110,7 +98,7 @@ function cryptoExchangeInner(state = initialState, action: Action): CryptoExchan
     case 'SELECT_TO_WALLET_CRYPTO_EXCHANGE': {
       return {
         ...state,
-        toWallet: action.data.wallet,
+        toWalletId: action.data.walletId,
         toCurrencyCode: action.data.currencyCode,
         toWalletPrimaryInfo: action.data.primaryInfo,
         toCurrencyIcon: action.data.symbolImage,

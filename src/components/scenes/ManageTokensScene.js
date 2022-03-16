@@ -1,16 +1,18 @@
 // @flow
 
-import type { EdgeMetaToken } from 'edge-core-js'
+import type { Disklet } from 'disklet'
+import type { EdgeCurrencyWallet, EdgeMetaToken } from 'edge-core-js'
 import { difference, keys, union } from 'lodash'
 import * as React from 'react'
 import { FlatList, View } from 'react-native'
 
+import { approveTokenTerms } from '../../actions/TokenTermsActions.js'
 import { checkEnabledTokensArray, setWalletEnabledTokens } from '../../actions/WalletActions'
 import { getSpecialCurrencyInfo, PREFERRED_TOKENS } from '../../constants/WalletAndCurrencyConstants.js'
 import s from '../../locales/strings.js'
 import { connect } from '../../types/reactRedux.js'
 import { type NavigationProp, type RouteProp } from '../../types/routerTypes.js'
-import type { CustomTokenInfo, GuiWallet } from '../../types/types.js'
+import { type CustomTokenInfo, type GuiWallet, asSafeDefaultGuiWallet } from '../../types/types.js'
 import { mergeTokensRemoveInvisible } from '../../util/utils'
 import { SceneWrapper } from '../common/SceneWrapper.js'
 import { WalletListModal } from '../modals/WalletListModal'
@@ -32,9 +34,11 @@ type DispatchProps = {
 }
 
 type StateProps = {
+  disklet: Disklet,
   wallets: { [walletId: string]: GuiWallet },
+  currencyWallets: { [walletId: string]: EdgeCurrencyWallet },
   manageTokensPending: boolean,
-  metaTokens: EdgeMetaToken[],
+  enabledTokens: string[],
   settingsCustomTokens: CustomTokenInfo[]
 }
 
@@ -42,8 +46,8 @@ type Props = OwnProps & DispatchProps & StateProps & ThemeProps
 
 type State = {
   walletId: string,
-  enabledList: string[],
-  combinedCurrencyInfos: EdgeMetaToken[],
+  tokensToEnable: string[],
+  tokensToDisable: string[],
   searchValue: string
 }
 
@@ -51,44 +55,30 @@ class ManageTokensSceneComponent extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props)
     const { route } = this.props
-    const { guiWallet } = route.params
-    const { enabledTokens, id } = guiWallet
+    const { walletId } = route.params
 
     this.state = {
-      walletId: id,
-      enabledList: [...enabledTokens],
-      combinedCurrencyInfos: [],
+      walletId,
+      tokensToEnable: [],
+      tokensToDisable: [],
       searchValue: ''
     }
   }
 
-  componentDidUpdate(prevProps) {
-    const { route } = this.props
-    const { guiWallet } = route.params
-    if (guiWallet.id !== prevProps.route.params.guiWallet.id) {
-      this.updateTokens()
-    }
-  }
-
-  updateTokens() {
-    const { route } = this.props
-    const { guiWallet } = route.params
-    this.setState({ enabledList: [...guiWallet.enabledTokens] })
-  }
-
   getTokens(): EdgeMetaToken[] {
-    const { route } = this.props
-    const { guiWallet } = route.params
-    const { metaTokens, currencyCode } = guiWallet
+    const { route, wallets, currencyWallets } = this.props
+    const { walletId } = route.params
+    const { metaTokens, type } = wallets[walletId]
+    const { pluginId } = currencyWallets[walletId].currencyInfo
 
-    const specialCurrencyInfo = getSpecialCurrencyInfo(currencyCode)
+    const specialCurrencyInfo = getSpecialCurrencyInfo(pluginId)
 
     const customTokens = this.props.settingsCustomTokens
 
     const accountMetaTokenInfo: CustomTokenInfo[] = specialCurrencyInfo.isCustomTokensSupported ? [...customTokens] : []
 
     const filteredTokenInfo = accountMetaTokenInfo.filter(token => {
-      return token.walletType === guiWallet.type || token.walletType === undefined
+      return token.walletType === type || token.walletType === undefined
     })
 
     const combinedTokenInfo = mergeTokensRemoveInvisible(metaTokens, filteredTokenInfo)
@@ -143,21 +133,22 @@ class ManageTokensSceneComponent extends React.Component<Props, State> {
     ))
 
     if (walletId && currencyCode) {
-      navigation.setParams({ guiWallet: this.props.wallets[walletId] })
+      navigation.setParams({ walletId })
     }
   }
 
-  toggleToken = (currencyCode: string) => {
-    const newEnabledList = this.state.enabledList
-    const index = newEnabledList.indexOf(currencyCode)
-    if (index >= 0) {
-      newEnabledList.splice(index, 1)
+  toggleToken = (currencyCode: string, enable: boolean) => {
+    if (enable) {
+      this.setState({
+        tokensToEnable: union(this.state.tokensToEnable, [currencyCode]),
+        tokensToDisable: difference(this.state.tokensToDisable, [currencyCode])
+      })
     } else {
-      newEnabledList.push(currencyCode)
+      this.setState({
+        tokensToEnable: difference(this.state.tokensToEnable, [currencyCode]),
+        tokensToDisable: union(this.state.tokensToDisable, [currencyCode])
+      })
     }
-    this.setState({
-      enabledList: newEnabledList
-    })
   }
 
   getFilteredTokens = (): EdgeMetaToken[] => {
@@ -172,68 +163,53 @@ class ManageTokensSceneComponent extends React.Component<Props, State> {
     this.setState({ searchValue: value })
   }
 
-  saveEnabledTokenList = () => {
-    const { navigation, route } = this.props
-    const { guiWallet } = route.params
-    const { id } = guiWallet
-    const disabledList: string[] = []
-    // get disabled list
-    for (const val of this.state.combinedCurrencyInfos) {
-      if (this.state.enabledList.indexOf(val.currencyCode) === -1) disabledList.push(val.currencyCode)
-    }
-    this.props.setEnabledTokensList(id, this.state.enabledList, disabledList)
+  saveEnabledTokenList = async () => {
+    const { disklet, navigation, route, wallets, enabledTokens } = this.props
+
+    const { walletId } = route.params
+    const { currencyCode, id } = wallets[walletId]
+    const newEnabledTokens = difference(union(this.state.tokensToEnable, enabledTokens), this.state.tokensToDisable)
+    if (newEnabledTokens.length > 0) await approveTokenTerms(disklet, currencyCode)
+
+    this.props.setEnabledTokensList(id, newEnabledTokens, [])
     navigation.goBack()
-  }
-
-  onDeleteToken = (currencyCode: string) => {
-    const enabledListAfterDelete = difference(this.state.enabledList, [currencyCode])
-    this.setState({
-      enabledList: enabledListAfterDelete
-    })
-  }
-
-  onAddToken = (currencyCode: string) => {
-    const newEnabledList = union(this.state.enabledList, [currencyCode])
-    this.setState({
-      enabledList: newEnabledList
-    })
   }
 
   goToAddTokenScene = () => {
     const { navigation, route } = this.props
-    const { guiWallet } = route.params
-    const { id } = guiWallet
+    const { walletId } = route.params
     navigation.navigate('addToken', {
-      walletId: id,
-      onAddToken: this.onAddToken
+      walletId
     })
   }
 
   goToEditTokenScene = (currencyCode: string) => {
-    const { navigation, route } = this.props
-    const { guiWallet } = route.params
-    const { id, metaTokens } = guiWallet
+    const { navigation, route, wallets } = this.props
+    const { walletId } = route.params
+    const { id, metaTokens } = wallets[walletId]
     navigation.navigate('editToken', {
       walletId: id,
       currencyCode,
-      metaTokens,
-      onDeleteToken: this.onDeleteToken
+      metaTokens
     })
   }
 
   render() {
-    const { route, manageTokensPending, theme } = this.props
-    const { searchValue, enabledList } = this.state
-    const { guiWallet } = route.params
-    const { name, currencyCode } = guiWallet
+    const { route, manageTokensPending, theme, wallets, enabledTokens, currencyWallets } = this.props
+    const { searchValue } = this.state
+    const { walletId } = route.params
+    if (wallets[walletId] == null || currencyWallets[walletId] == null) return null
+    const { name, currencyCode } = wallets[walletId]
+    const { pluginId, metaTokens } = currencyWallets[walletId].currencyInfo
     const styles = getStyles(theme)
+    const tempEnabledTokens = difference(union(this.state.tokensToEnable, enabledTokens), this.state.tokensToDisable)
 
     return (
       <SceneWrapper>
         <SceneHeader underline>
           <ManageTokensHeader
             walletName={name}
-            walletId={guiWallet.id}
+            walletId={walletId}
             currencyCode={currencyCode}
             changeSearchValue={this.changeSearchValue}
             onSelectWallet={this.onSelectWallet}
@@ -247,11 +223,11 @@ class ManageTokensSceneComponent extends React.Component<Props, State> {
             <ManageTokensRow
               goToEditTokenScene={this.goToEditTokenScene}
               metaToken={metaToken}
-              walletId={guiWallet.id}
-              symbolImage={getCurrencyIcon(currencyCode, metaToken.item.currencyCode).symbolImage}
+              walletId={walletId}
+              symbolImage={getCurrencyIcon(pluginId, metaToken.item.contractAddress).symbolImage}
               toggleToken={this.toggleToken}
-              enabledList={enabledList}
-              metaTokens={guiWallet.metaTokens}
+              enabledList={tempEnabledTokens}
+              metaTokens={metaTokens}
             />
           )}
           style={styles.tokensArea}
@@ -288,17 +264,14 @@ const getStyles = cacheStyles((theme: Theme) => ({
 }))
 
 export const ManageTokensScene = connect<StateProps, DispatchProps, OwnProps>(
-  (state, { route: { params } }) => {
-    const { guiWallet } = params
-    const wallets = state.ui.wallets.byId
-    const wallet = wallets[guiWallet.id]
-    return {
-      manageTokensPending: state.ui.wallets.manageTokensPending,
-      settingsCustomTokens: state.ui.settings.customTokens,
-      metaTokens: wallet.metaTokens,
-      wallets
-    }
-  },
+  (state, { route: { params } }) => ({
+    disklet: state.core.disklet,
+    manageTokensPending: state.ui.wallets.manageTokensPending,
+    settingsCustomTokens: state.ui.settings.customTokens,
+    wallets: state.ui.wallets.byId,
+    currencyWallets: state.core.account.currencyWallets,
+    enabledTokens: asSafeDefaultGuiWallet(state.ui.wallets.byId[params.walletId]).enabledTokens
+  }),
   dispatch => ({
     setEnabledTokensList(walletId: string, enabledTokens: string[], oldEnabledTokensList: string[]) {
       dispatch(setWalletEnabledTokens(walletId, enabledTokens, oldEnabledTokensList))

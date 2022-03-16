@@ -4,13 +4,11 @@ import type { EdgeCurrencyWallet } from 'edge-core-js'
 import * as React from 'react'
 
 import { refreshAllFioAddresses } from '../../actions/FioAddressActions.js'
-import { formatDate } from '../../locales/intl.js'
 import s from '../../locales/strings'
 import { FioActionSubmit } from '../../modules/FioAddress/components/FioActionSubmit'
-import { getRenewalFee, getTransferFee, renewFioName } from '../../modules/FioAddress/util'
+import { addBundledTxs, getAddBundledTxsFee, getTransferFee } from '../../modules/FioAddress/util'
 import { connect } from '../../types/reactRedux.js'
 import { type NavigationProp, type RouteProp } from '../../types/routerTypes.js'
-import type { FioAddress } from '../../types/types'
 import { SceneWrapper } from '../common/SceneWrapper'
 import { ButtonsModal } from '../modals/ButtonsModal'
 import { Airship, showError, showToast } from '../services/AirshipInstance'
@@ -20,12 +18,11 @@ import { MainButton } from '../themed/MainButton.js'
 import { Tile } from '../themed/Tile'
 
 type LocalState = {
-  showRenew: boolean,
+  showAddBundledTxs: boolean,
   showTransfer: boolean
 }
 
 type StateProps = {
-  fioAddresses: FioAddress[],
   isConnected: boolean
 }
 
@@ -42,34 +39,34 @@ type Props = StateProps & DispatchProps & ThemeProps & OwnProps
 
 class FioAddressSettingsComponent extends React.Component<Props, LocalState> {
   state: LocalState = {
-    showRenew: false,
+    showAddBundledTxs: false,
     showTransfer: false
   }
 
   componentDidMount(): * {
     const { refreshAllFioAddresses, route } = this.props
-    const { showRenew } = route.params
+    const { showAddBundledTxs } = route.params
     refreshAllFioAddresses()
-    if (showRenew) {
-      this.setState({ showRenew: true })
+    if (showAddBundledTxs) {
+      this.setState({ showAddBundledTxs: true })
     }
   }
 
-  afterRenewSuccess = ({ expiration = '' }) => {
+  afterAddBundledTxsSuccess = (result: { bundledTxs: number } | any) => {
     const { refreshAllFioAddresses, navigation, route } = this.props
-    const { fioWallet, fioAddressName, refreshAfterRenew } = route.params
+    const { fioWallet, fioAddressName, refreshAfterAddBundledTxs } = route.params
 
     refreshAllFioAddresses()
 
-    this.setState({ showRenew: false })
-    showToast(s.strings.fio_request_renew_ok_text)
-    navigation.goBack()
-    if (refreshAfterRenew) {
+    this.setState({ showAddBundledTxs: false })
+    showToast(s.strings.fio_request_add_bundled_txs_ok_text)
+    navigation.goBack() // todo: fix goBack, now it is not going back to address details scene
+    if (result.bundledTxs != null && refreshAfterAddBundledTxs) {
       window.requestAnimationFrame(() => {
         navigation.setParams({
           fioWallet,
           fioAddressName,
-          expiration
+          bundledTxs: result.bundledTxs
         })
       })
     }
@@ -90,31 +87,21 @@ class FioAddressSettingsComponent extends React.Component<Props, LocalState> {
     return navigation.navigate('fioAddressList')
   }
 
-  getExpiration = (): string => {
-    const { fioAddresses, route } = this.props
-    const { fioAddressName } = route.params
-    const fioAddress = fioAddresses.find(({ name }) => fioAddressName === name)
-    if (fioAddress) return fioAddress.expiration
-    return ''
-  }
-
-  onRenewPress = () => {
-    this.setState({ showRenew: true })
-  }
-
   onTransferPress = () => {
     this.setState({ showTransfer: true })
   }
 
-  cancelOperation = () => {
-    this.setState({ showRenew: false, showTransfer: false })
+  onAddBundledTxsPress = () => {
+    this.setState({ showAddBundledTxs: true })
   }
 
-  getRenewalFee = async (fioWallet: EdgeCurrencyWallet) => getRenewalFee(fioWallet)
+  cancelOperation = () => {
+    this.setState({ showTransfer: false, showAddBundledTxs: false })
+  }
 
   getTransferFee = async (fioWallet: EdgeCurrencyWallet) => getTransferFee(fioWallet)
 
-  renewAddress = async (fioWallet: EdgeCurrencyWallet, renewalFee: number) => {
+  onAddBundledTxsSubmit = async (fioWallet: EdgeCurrencyWallet, fee: number) => {
     const { isConnected, route } = this.props
     const { fioAddressName } = route.params
 
@@ -122,12 +109,17 @@ class FioAddressSettingsComponent extends React.Component<Props, LocalState> {
       showError(s.strings.fio_network_alert_text)
       return
     }
-    return renewFioName(fioWallet, fioAddressName, renewalFee)
+    return addBundledTxs(fioWallet, fioAddressName, fee)
   }
 
   goToTransfer = (params: { fee: number }) => {
-    const { navigation, route } = this.props
+    const { isConnected, navigation, route } = this.props
     const { fioWallet, fioAddressName } = route.params
+
+    if (!isConnected) {
+      showError(s.strings.fio_network_alert_text)
+      return
+    }
 
     const { fee: transferFee } = params
     if (!transferFee) return showError(s.strings.fio_get_fee_err_msg)
@@ -137,8 +129,10 @@ class FioAddressSettingsComponent extends React.Component<Props, LocalState> {
       nativeAmount: '',
       currencyCode: fioWallet.currencyInfo.currencyCode,
       otherParams: {
-        fioAction: 'transferFioAddress',
-        fioParams: { fioAddress: fioAddressName, newOnwerKey: '', maxFee: transferFee }
+        action: {
+          name: 'transferFioAddress',
+          params: { fioAddress: fioAddressName, maxFee: transferFee }
+        }
       },
       onDone: (err, edgeTransaction) => {
         if (!err) {
@@ -164,20 +158,19 @@ class FioAddressSettingsComponent extends React.Component<Props, LocalState> {
 
   render() {
     const { route } = this.props
-    const { fioAddressName, fioWallet, expiration = this.getExpiration() } = route.params
-    const { showRenew, showTransfer } = this.state
+    const { fioAddressName, fioWallet, bundledTxs } = route.params
+    const { showTransfer, showAddBundledTxs } = this.state
 
     return (
       <SceneWrapper background="header">
         <Tile type="static" title={s.strings.fio_address_register_form_field_label} body={fioAddressName} />
-        <Tile type="static" title={s.strings.fio_address_details_screen_expires} body={formatDate(new Date(expiration))} />
-        {showRenew && (
+        {bundledTxs != null ? <Tile type="static" title={s.strings.fio_address_details_screen_bundled_txs} body={`${bundledTxs}`} /> : null}
+        {showAddBundledTxs && (
           <FioActionSubmit
-            title={s.strings.title_fio_renew_address}
-            onSubmit={this.renewAddress}
-            onSuccess={this.afterRenewSuccess}
-            getOperationFee={this.getRenewalFee}
-            successMessage={s.strings.fio_request_renew_ok_text}
+            onSubmit={this.onAddBundledTxsSubmit}
+            onSuccess={this.afterAddBundledTxsSuccess}
+            getOperationFee={getAddBundledTxsFee}
+            successMessage={s.strings.fio_request_add_bundled_txs_ok_text}
             cancelOperation={this.cancelOperation}
             fioWallet={fioWallet}
             addressTitles
@@ -185,9 +178,9 @@ class FioAddressSettingsComponent extends React.Component<Props, LocalState> {
           />
         )}
         {showTransfer && <FioActionSubmit goTo={this.goToTransfer} getOperationFee={this.getTransferFee} fioWallet={fioWallet} addressTitles />}
-        {!showRenew && !showTransfer && (
+        {!showAddBundledTxs && !showTransfer && (
           <>
-            <MainButton label={s.strings.title_fio_renew_address} onPress={this.onRenewPress} marginRem={[1.5, 1, 0.25]} />
+            <MainButton label={s.strings.title_fio_add_bundled_txs} onPress={this.onAddBundledTxsPress} marginRem={[1.5, 1, 0.25]} />
             <MainButton label={s.strings.title_fio_transfer_address} onPress={this.onTransferPress} marginRem={[0.25, 1]} />
           </>
         )}
@@ -198,7 +191,6 @@ class FioAddressSettingsComponent extends React.Component<Props, LocalState> {
 
 export const FioAddressSettingsScene = connect<StateProps, DispatchProps, OwnProps>(
   state => ({
-    fioAddresses: state.ui.scenes.fioAddress.fioAddresses,
     isConnected: state.network.isConnected
   }),
   dispatch => ({

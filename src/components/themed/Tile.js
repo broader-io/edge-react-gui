@@ -4,11 +4,18 @@ import Clipboard from '@react-native-community/clipboard'
 import * as React from 'react'
 import { ActivityIndicator, TouchableWithoutFeedback, View } from 'react-native'
 import FontAwesomeIcon from 'react-native-vector-icons/FontAwesome'
+import SimpleLineIcons from 'react-native-vector-icons/SimpleLineIcons'
 
 import s from '../../locales/strings.js'
 import { showToast } from '../services/AirshipInstance.js'
 import { type Theme, type ThemeProps, cacheStyles, withTheme } from '../services/ThemeContext.js'
 import { EdgeText } from './EdgeText.js'
+
+const textHeights = {
+  small: 2,
+  medium: 3,
+  large: 0
+}
 
 type OwnProps = {
   body?: string,
@@ -16,8 +23,9 @@ type OwnProps = {
   error?: boolean,
   onPress?: () => void,
   title: string,
-  type: 'editable' | 'static' | 'touchable' | 'copy' | 'loading',
-  contentPadding?: boolean
+  type: 'copy' | 'editable' | 'questionable' | 'loading' | 'static' | 'touchable',
+  contentPadding?: boolean,
+  maximumHeight?: 'small' | 'medium' | 'large'
 }
 type Props = OwnProps & ThemeProps
 
@@ -29,9 +37,11 @@ class TileComponent extends React.PureComponent<Props> {
   }
 
   render() {
-    const { body, title, contentPadding = true, children, theme, type, error } = this.props
+    const { body, title, contentPadding = true, children, theme, type, maximumHeight = 'medium', error } = this.props
     const styles = getStyles(theme)
     const onPress = type === 'copy' ? () => this.copy() : this.props.onPress
+    const numberOfLines = textHeights[maximumHeight]
+
     if (type === 'loading') {
       return (
         <View>
@@ -52,9 +62,10 @@ class TileComponent extends React.PureComponent<Props> {
             <View style={[styles.content, contentPadding ? styles.contentPadding : null]}>
               {type === 'editable' && <FontAwesomeIcon name="edit" style={styles.editIcon} />}
               {type === 'copy' && <FontAwesomeIcon name="copy" style={styles.editIcon} />}
+              {type === 'questionable' && <SimpleLineIcons name="question" style={styles.editIcon} />}
               <EdgeText style={error ? styles.textHeaderError : styles.textHeader}>{title}</EdgeText>
               {typeof body === 'string' && (
-                <EdgeText style={styles.textBody} numberOfLines={3}>
+                <EdgeText style={styles.textBody} numberOfLines={numberOfLines} ellipsizeMode="tail">
                   {body}
                 </EdgeText>
               )}

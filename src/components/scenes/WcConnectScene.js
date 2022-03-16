@@ -37,17 +37,19 @@ export const WcConnectScene = (props: Props) => {
   const connected = useRef(false)
   const theme = useTheme()
   const styles = getStyles(theme)
-  const { wcQRUri } = props.route.params
+  const { uri } = props.route.params
   const [dappDetails, setDappDetails] = useState({ subTitleText: '', bodyTitleText: '', dAppImage: '' })
 
   const { walletAddress, walletImageUri, walletName, wallet, currencyWallets } = useSelector(state => {
     const { currencyWallets } = state.core.account
     const guiWallet = getSelectedWallet(state)
+    const wallet = currencyWallets[guiWallet.id]
+    const { pluginId, metaTokens } = wallet.currencyInfo
     const walletCurrencyCode = state.ui.wallets.selectedCurrencyCode
-    const walletImageUri = getCurrencyIcon(guiWallet.currencyCode, walletCurrencyCode).symbolImage
+    const contractAddress = metaTokens.find(token => token.currencyCode === walletCurrencyCode)?.contractAddress
+    const walletImageUri = getCurrencyIcon(pluginId, contractAddress).symbolImage
     const walletName = guiWallet.name
     const walletAddress = guiWallet.receiveAddress.publicAddress
-    const wallet = currencyWallets[guiWallet.id]
     return {
       walletAddress,
       walletImageUri,
@@ -60,7 +62,7 @@ export const WcConnectScene = (props: Props) => {
 
   const handleConnect = async () => {
     try {
-      await wallet.otherMethods.wcConnect(wcQRUri, walletAddress, wallet.id)
+      await wallet.otherMethods.wcConnect(uri, walletAddress, wallet.id)
       connected.current = true
       Airship.show(bridge => <FlashNotification bridge={bridge} message={s.strings.wc_confirm_return_to_browser} onPress={() => {}} />)
       navigation.navigate('wcConnections')
@@ -71,7 +73,7 @@ export const WcConnectScene = (props: Props) => {
 
   const handleRequestDapp = async walletId => {
     try {
-      const dApp = await currencyWallets[walletId].otherMethods.wcInit({ uri: wcQRUri })
+      const dApp = await currencyWallets[walletId].otherMethods.wcInit({ uri })
       const dAppName = String(dApp.peerMeta.name).split(' ')[0]
       setDappDetails({
         subTitleText: sprintf(s.strings.wc_confirm_subtitle, dAppName),
@@ -110,7 +112,7 @@ export const WcConnectScene = (props: Props) => {
 
   useEffect(() => {
     return () => {
-      if (!connected.current && wallet?.otherMethods?.wcDisconnect != null) wallet.otherMethods.wcDisconnect(wcQRUri)
+      if (!connected.current && wallet?.otherMethods?.wcDisconnect != null) wallet.otherMethods.wcDisconnect(uri)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

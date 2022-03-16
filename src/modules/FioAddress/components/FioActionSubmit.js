@@ -1,6 +1,6 @@
 // @flow
 
-import { bns } from 'biggystring'
+import { div } from 'biggystring'
 import type { EdgeCurrencyWallet } from 'edge-core-js'
 import * as React from 'react'
 import { ActivityIndicator, View } from 'react-native'
@@ -13,18 +13,27 @@ import { cacheStyles, withTheme } from '../../../components/services/ThemeContex
 import { EdgeText } from '../../../components/themed/EdgeText'
 import { MainButton } from '../../../components/themed/MainButton.js'
 import { Tile } from '../../../components/themed/Tile'
-import { FIO_STR } from '../../../constants/WalletAndCurrencyConstants.js'
+import { FIO_STR } from '../../../constants/WalletAndCurrencyConstants'
 import s from '../../../locales/strings'
 import { getDisplayDenomination } from '../../../selectors/DenominationSelectors.js'
 import { connect } from '../../../types/reactRedux.js'
+import { getAvailableBalance } from '../../../util/CurrencyWalletHelpers.js'
 import { DECIMAL_PRECISION, truncateDecimals } from '../../../util/utils'
 import { Slider } from '../../UI/components/Slider/Slider'
 
+type ActionResult =
+  | {
+      expiration: string
+    }
+  | {
+      bundledTxs: number
+    }
+  | any
 type OwnProps = {
   title?: string,
   successMessage?: string,
   onSubmit?: (wallet: EdgeCurrencyWallet, fee: number) => Promise<any>,
-  onSuccess?: ({ expiration?: string }) => void,
+  onSuccess?: (attrs: ActionResult) => void,
   cancelOperation?: () => void,
   goTo?: (params: any) => void,
   getOperationFee: EdgeCurrencyWallet => Promise<number>,
@@ -94,7 +103,7 @@ class FioActionSubmitComponent extends React.Component<Props, State> {
 
     try {
       this.setState({ loading: true })
-      let result: { expiration?: string } = {}
+      let result: ActionResult = {}
       if (onSubmit) {
         result = await onSubmit(paymentWallet, fee)
       }
@@ -155,15 +164,15 @@ class FioActionSubmitComponent extends React.Component<Props, State> {
     const { addressTitles } = this.props
     const { paymentWallet } = this.state
     if (paymentWallet) {
-      const balance = paymentWallet.balances[paymentWallet.currencyInfo.currencyCode] ?? '0'
-      this.setState({ balance: this.formatFio(balance) })
+      const availbleBalance = getAvailableBalance(paymentWallet)
+      this.setState({ balance: this.formatFio(availbleBalance) })
     } else {
       showError(addressTitles ? s.strings.fio_wallet_missing_for_fio_address : s.strings.fio_wallet_missing_for_fio_domain)
     }
   }
 
   formatFio(val: string): number {
-    return parseFloat(truncateDecimals(bns.div(val, this.props.denominationMultiplier, DECIMAL_PRECISION), 6))
+    return parseFloat(truncateDecimals(div(val, this.props.denominationMultiplier, DECIMAL_PRECISION)))
   }
 
   renderFeeAndBalance() {
@@ -262,8 +271,8 @@ const getStyles = cacheStyles((theme: Theme) => ({
 }))
 
 export const FioActionSubmit = connect<StateProps, {}, OwnProps>(
-  state => ({
-    denominationMultiplier: getDisplayDenomination(state, FIO_STR).multiplier,
+  (state, ownProps) => ({
+    denominationMultiplier: getDisplayDenomination(state, ownProps.fioWallet.currencyInfo.pluginId, FIO_STR).multiplier,
     currencyWallets: state.core.account.currencyWallets,
     fioWallets: state.ui.wallets.fioWallets
   }),

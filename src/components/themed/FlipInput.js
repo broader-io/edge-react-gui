@@ -1,7 +1,7 @@
 // @flow
 
 import Clipboard from '@react-native-community/clipboard'
-import { bns } from 'biggystring'
+import { div, eq, mul } from 'biggystring'
 import * as React from 'react'
 import { type Event, Animated, Platform, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native'
 import FastImage from 'react-native-fast-image'
@@ -116,7 +116,7 @@ const setPrimaryToSecondary = (props: Props, primaryDecimalAmount: string): Amou
   const primaryDisplayAmount = formatNumberInput(prettifyNumber(primaryDecimalAmount))
 
   // Converts to secondary value using exchange rate
-  let secondaryDecimalAmount = bns.mul(primaryDecimalAmount, props.exchangeSecondaryToPrimaryRatio)
+  let secondaryDecimalAmount = mul(primaryDecimalAmount, props.exchangeSecondaryToPrimaryRatio)
 
   // Truncate to however many decimals the secondary format should have
   secondaryDecimalAmount = truncateDecimalsUtils(secondaryDecimalAmount, props.secondaryInfo.maxConversionDecimals)
@@ -133,7 +133,7 @@ const setSecondaryToPrimary = (props: Props, secondaryDecimalAmount: string): Am
   const secondaryDisplayAmount = formatNumberInput(prettifyNumber(secondaryDecimalAmount))
   const primaryAmountFull = zeroString(props.exchangeSecondaryToPrimaryRatio)
     ? '0'
-    : bns.div(secondaryDecimalAmount, props.exchangeSecondaryToPrimaryRatio, DECIMAL_PRECISION)
+    : div(secondaryDecimalAmount, props.exchangeSecondaryToPrimaryRatio, DECIMAL_PRECISION)
   const primaryDecimalAmount = truncateDecimalsUtils(primaryAmountFull, props.primaryInfo.maxConversionDecimals)
   const primaryDisplayAmount = formatNumberInput(prettifyNumber(primaryDecimalAmount))
   return { primaryDisplayAmount, primaryDecimalAmount, secondaryDisplayAmount, secondaryDecimalAmount }
@@ -197,7 +197,7 @@ class FlipInputComponent extends React.PureComponent<Props, State> {
   componentDidMount() {
     this.props.flipInputRef(this)
     setTimeout(() => {
-      if (this.props.keyboardVisible && bns.eq(this.props.overridePrimaryDecimalAmount, '0') && this.textInputFront) {
+      if (this.props.keyboardVisible && eq(this.props.overridePrimaryDecimalAmount, '0') && this.textInputFront) {
         this.textInputFront.focus()
       }
     }, 400)
@@ -461,7 +461,7 @@ class FlipInputComponent extends React.PureComponent<Props, State> {
     const onFocus = isFront ? this.textInputFrontFocusTrue : this.textInputBackFocusTrue
     const onBlur = isFront ? this.textInputFrontFocusFalse : this.textInputBackFocusFalse
     const ref = isFront ? this.getTextInputFrontRef : this.getTextInputBackRef
-    const displayAmountCheck = decimalAmount.match(/^0*$/) && !showCursor
+    const displayAmountCheck = (decimalAmount.match(/^0*$/) && !showCursor) || displayAmount === ''
     const displayAmountString = displayAmountCheck ? s.strings.string_amount : displayAmount
     const displayAmountStyle = displayAmountCheck ? styles.bottomAmountMuted : styles.bottomAmount
     const currencyNameStyle = displayAmountCheck ? styles.bottomCurrencyMuted : styles.bottomCurrency
@@ -469,10 +469,17 @@ class FlipInputComponent extends React.PureComponent<Props, State> {
     return (
       <TouchableWithoutFeedback onPress={onPress}>
         <View style={styles.bottomContainer} key="bottom">
-          <View style={styles.valueContainer}>
-            <EdgeText style={displayAmountStyle}>{displayAmountString}</EdgeText>
-            {showCursor && <BlinkingCursor fontSize={1.5} color={theme.deactivatedText} />}
-          </View>
+          {displayAmount === '' ? (
+            <View style={styles.valueContainer}>
+              <BlinkingCursor showCursor={showCursor} />
+              <EdgeText style={displayAmountStyle}>{displayAmountString}</EdgeText>
+            </View>
+          ) : (
+            <View style={styles.valueContainer}>
+              <EdgeText style={displayAmountStyle}>{displayAmountString}</EdgeText>
+              <BlinkingCursor showCursor={showCursor} />
+            </View>
+          )}
           <EdgeText style={currencyNameStyle}>{currencyName}</EdgeText>
           <TextInput
             style={styles.hiddenTextInput}
@@ -554,11 +561,11 @@ class FlipInputComponent extends React.PureComponent<Props, State> {
   }
 }
 
-const BlinkingCursor = () => {
+const BlinkingCursor = ({ showCursor }: { showCursor: boolean }) => {
   const theme = useTheme()
   const styles = getStyles(theme)
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: withRepeat(withSequence(withDelay(500, withTiming(1, { duration: 1 })), withDelay(500, withTiming(0, { duration: 1 }))), -1)
+    opacity: showCursor ? withRepeat(withSequence(withDelay(500, withTiming(1, { duration: 1 })), withDelay(500, withTiming(0, { duration: 1 }))), -1) : 0
   }))
 
   return (

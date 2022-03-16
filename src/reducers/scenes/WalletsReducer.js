@@ -1,9 +1,9 @@
 // @flow
 
-import type { EdgeCurrencyWallet, EdgeDenomination, EdgeMetaToken, EdgeReceiveAddress } from 'edge-core-js'
+import type { EdgeCurrencyWallet, EdgeDenomination, EdgeReceiveAddress } from 'edge-core-js'
 import { type Reducer, combineReducers } from 'redux'
 
-import { FIO_WALLET_TYPE } from '../../constants/WalletAndCurrencyConstants'
+import { FIO_WALLET_TYPE, SPECIAL_CURRENCY_INFO, STAKING_BALANCES } from '../../constants/WalletAndCurrencyConstants'
 import type { Action } from '../../types/reduxTypes.js'
 import type { GuiWallet } from '../../types/types.js'
 import { getCurrencyIcon } from '../../util/CurrencyInfoHelpers.js'
@@ -33,6 +33,12 @@ const byId = (state = {}, action: Action): $PropertyType<WalletsState, 'byId'> =
           enabledTokensOnWallet.forEach(customToken => {
             tempWallet.nativeBalances[customToken] = wallets[walletId].balances[customToken] ?? '0'
           })
+          if (SPECIAL_CURRENCY_INFO[wallets[walletId].currencyInfo.pluginId]?.isStakingSupported) {
+            for (const cCodeKey in STAKING_BALANCES) {
+              const stakingCurrencyCode = `${tempWallet.currencyCode}${STAKING_BALANCES[cCodeKey]}`
+              tempWallet.nativeBalances[stakingCurrencyCode] = wallets[walletId].balances[stakingCurrencyCode] ?? '0'
+            }
+          }
         }
         out[walletId] = {
           ...state[walletId],
@@ -131,6 +137,13 @@ const byId = (state = {}, action: Action): $PropertyType<WalletsState, 'byId'> =
         enabledTokensOnWallet.forEach(customToken => {
           guiWallet.nativeBalances[customToken] = wallet.balances[customToken] ?? '0'
         })
+
+        if (SPECIAL_CURRENCY_INFO[wallet.currencyInfo.pluginId]?.isStakingSupported) {
+          for (const cCodeKey in STAKING_BALANCES) {
+            const stakingCurrencyCode = `${guiWallet.currencyCode}${STAKING_BALANCES[cCodeKey]}`
+            guiWallet.nativeBalances[stakingCurrencyCode] = wallet.balances[stakingCurrencyCode] ?? '0'
+          }
+        }
         out[wallet.id] = {
           ...state[wallet.id],
           ...guiWallet
@@ -277,11 +290,9 @@ function schema(wallet: EdgeCurrencyWallet, receiveAddress: EdgeReceiveAddress):
   const type: string = wallet.type
   const name: string = wallet.name || 'no wallet name'
 
-  const currencyCode: string = wallet.currencyInfo.currencyCode
+  const { currencyCode, metaTokens, denominations, pluginId } = wallet.currencyInfo
   const fiatCurrencyCode: string = wallet.fiatCurrencyCode.replace('iso:', '')
   const isoFiatCurrencyCode: string = wallet.fiatCurrencyCode
-  const metaTokens: EdgeMetaToken[] = wallet.currencyInfo.metaTokens
-  const denominations: EdgeDenomination[] = wallet.currencyInfo.denominations
   const blockHeight: number = wallet.blockHeight
   // TODO: Fetch the token list asynchonously before dispatching `schema`:
   const enabledTokens: string[] = []
@@ -344,7 +355,7 @@ function schema(wallet: EdgeCurrencyWallet, receiveAddress: EdgeReceiveAddress):
     enabledTokens,
     receiveAddress,
     blockHeight,
-    ...getCurrencyIcon(currencyCode)
+    ...getCurrencyIcon(pluginId)
   }
 
   return newWallet

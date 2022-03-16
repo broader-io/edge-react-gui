@@ -24,10 +24,12 @@ type DispatchProps = {
   onSelectWallet: (walletId: string, currencyCode: string) => void
 }
 
-const TokenSupportedCurrencyCodes = Object.keys(SPECIAL_CURRENCY_INFO).filter(currencyCode => {
-  const { isCustomTokensSupported = false, isAccountActivationRequired = false, keysOnlyMode = false } = SPECIAL_CURRENCY_INFO[currencyCode]
-  return isCustomTokensSupported && !isAccountActivationRequired && !keysOnlyMode
-})
+const TokenSupportedCurrencyCodes = Object.keys(SPECIAL_CURRENCY_INFO)
+  .filter(pluginId => {
+    const { isCustomTokensSupported = false, isAccountActivationRequired = false, keysOnlyMode = false } = SPECIAL_CURRENCY_INFO[pluginId]
+    return isCustomTokensSupported && !isAccountActivationRequired && !keysOnlyMode
+  })
+  .map(pluginId => SPECIAL_CURRENCY_INFO[pluginId].chainCode)
 
 class WalletListFooterComponent extends React.PureComponent<StateProps & ThemeProps & DispatchProps> {
   renderAddButton = (title: string, onPress: () => void) => {
@@ -64,7 +66,7 @@ class WalletListFooterComponent extends React.PureComponent<StateProps & ThemePr
       .then(({ walletId, currencyCode }: WalletListResult) => {
         if (walletId != null && currencyCode != null) {
           onSelectWallet(walletId, currencyCode)
-          Actions.push(MANAGE_TOKENS, { guiWallet: this.props.wallets[walletId] })
+          Actions.push(MANAGE_TOKENS, { walletId })
         }
       })
       .catch(error => {

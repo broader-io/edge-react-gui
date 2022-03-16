@@ -1,12 +1,12 @@
 // @flow
 
-import { bns } from 'biggystring'
+import { mul, toFixed } from 'biggystring'
 import { type EdgeCurrencyConfig, type EdgeCurrencyWallet, type EdgeDenomination, type EdgeTransaction } from 'edge-core-js'
 import * as React from 'react'
 import { ActivityIndicator, Alert, Image, ScrollView, View } from 'react-native'
 import { sprintf } from 'sprintf-js'
 
-import { CURRENCY_PLUGIN_NAMES, FIO_STR } from '../../constants/WalletAndCurrencyConstants.js'
+import { FIO_STR } from '../../constants/WalletAndCurrencyConstants.js'
 import s from '../../locales/strings.js'
 import { getRegInfo } from '../../modules/FioAddress/util'
 import { getDisplayDenomination, getExchangeDenomination } from '../../selectors/DenominationSelectors.js'
@@ -151,9 +151,10 @@ class FioAddressRegisterSelectWallet extends React.Component<Props, LocalState> 
       } else {
         this.props.onSelectWallet(walletId, paymentCurrencyCode)
 
-        const exchangeDenomination = getExchangeDenomination(state, paymentCurrencyCode)
-        let nativeAmount = bns.mul(allPaymentInfo[paymentCurrencyCode].amount, exchangeDenomination.multiplier)
-        nativeAmount = bns.toFixed(nativeAmount, 0, 0)
+        const wallet = state.core.account.currencyWallets[walletId]
+        const exchangeDenomination = getExchangeDenomination(state, wallet.currencyInfo.pluginId, paymentCurrencyCode)
+        let nativeAmount = mul(allPaymentInfo[paymentCurrencyCode].amount, exchangeDenomination.multiplier)
+        nativeAmount = toFixed(nativeAmount, 0, 0)
 
         const guiMakeSpendInfo = {
           currencyCode: paymentCurrencyCode,
@@ -273,11 +274,11 @@ const getStyles = cacheStyles((theme: Theme) => ({
 }))
 
 export const FioAddressRegisterSelectWalletScene = connect<StateProps, DispatchProps, OwnProps>(
-  state => ({
+  (state, { route: { params } }) => ({
     state,
     fioWallets: state.ui.wallets.fioWallets,
-    fioPlugin: state.core.account.currencyConfig[CURRENCY_PLUGIN_NAMES.FIO],
-    fioDisplayDenomination: getDisplayDenomination(state, FIO_STR),
+    fioPlugin: state.core.account.currencyConfig.fio,
+    fioDisplayDenomination: getDisplayDenomination(state, params.selectedWallet.currencyInfo.pluginId, FIO_STR),
     defaultFiatCode: state.ui.settings.defaultIsoFiat,
     wallets: state.ui.wallets.byId,
     isConnected: state.network.isConnected

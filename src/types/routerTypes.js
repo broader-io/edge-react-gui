@@ -15,7 +15,6 @@ import {
   type GuiFiatType,
   type GuiMakeSpendInfo,
   type GuiSwapInfo,
-  type GuiWallet,
   type WcConnectionInfo
 } from './types.js'
 /**
@@ -28,7 +27,6 @@ export type ParamList = {
   edge: void,
   // Logged-in scenes:
   addToken: {|
-    onAddToken: (currencyCode: string) => void,
     contractAddress?: string,
     currencyCode?: string,
     currencyName?: string,
@@ -90,7 +88,6 @@ export type ParamList = {
   editToken: {|
     currencyCode: string,
     metaTokens: EdgeMetaToken[],
-    onDeleteToken(currencyCode: string): void,
     walletId: string
   |},
   exchange: void,
@@ -104,7 +101,7 @@ export type ParamList = {
   exchangeSuccess: void,
   fioAddressDetails: {|
     fioAddressName: string,
-    expiration: string
+    bundledTxs: number
   |},
   fioAddressList: void,
   fioAddressRegister: void,
@@ -116,14 +113,14 @@ export type ParamList = {
   |},
   fioAddressRegisterSuccess: {|
     fioName: string,
-    expiration: string
+    expiration?: string
   |},
   fioAddressSettings: {|
     fioWallet: EdgeCurrencyWallet,
     fioAddressName: string,
-    expiration?: string,
-    showRenew?: boolean,
-    refreshAfterRenew?: boolean
+    bundledTxs?: number,
+    showAddBundledTxs?: boolean,
+    refreshAfterAddBundledTxs?: boolean
   |},
   fioConnectToWalletsConfirm: {|
     fioWallet: EdgeCurrencyWallet,
@@ -159,11 +156,15 @@ export type ParamList = {
     amounts: ExchangedFlipInputAmounts
   |},
   fioRequestList: void,
+  fioRequestApproved: {|
+    edgeTransaction: EdgeTransaction,
+    thumbnailPath?: string
+  |},
   fioSentRequestDetails: {|
     selectedFioSentRequest: FioRequest
   |},
   manageTokens: {|
-    guiWallet: GuiWallet
+    walletId: string
   |},
   notificationSettings: void,
   otpRepair: {|
@@ -208,6 +209,15 @@ export type ParamList = {
   settingsOverview: void,
   settingsOverviewTab: void,
   spendingLimits: void,
+  stakingChange: {
+    change: 'add' | 'remove',
+    currencyCode: string,
+    walletId: string
+  },
+  stakingOverview: {
+    currencyCode: string,
+    walletId: string
+  },
   termsOfService: void,
   transactionDetails: {|
     edgeTransaction: EdgeTransaction,
@@ -222,7 +232,9 @@ export type ParamList = {
   walletListScene: void,
   wcConnections: void,
   wcDisconnect: {| wcConnectionInfo: WcConnectionInfo |},
-  wcConnect: {| dAppName: string, wcQRUri: string |}
+  wcConnect: {|
+    uri: string
+  |}
 }
 
 /**

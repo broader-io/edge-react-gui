@@ -9,12 +9,12 @@ import { sprintf } from 'sprintf-js'
 import { refreshAllFioAddresses } from '../../actions/FioAddressActions.js'
 import ENS_LOGO from '../../assets/images/ens_logo.png'
 import FIO_LOGO from '../../assets/images/fio/fio_logo.png'
-import { CURRENCY_PLUGIN_NAMES, ENS_DOMAINS, UNSTOPPABLE_DOMAINS } from '../../constants/WalletAndCurrencyConstants.js'
+import { ENS_DOMAINS, UNSTOPPABLE_DOMAINS } from '../../constants/WalletAndCurrencyConstants.js'
 import s from '../../locales/strings.js'
-import { type FioAddresses, checkExpiredFioAddress, checkPubAddress, getFioAddressCache } from '../../modules/FioAddress/util.js'
+import { type FioAddresses, checkPubAddress, getFioAddressCache } from '../../modules/FioAddress/util.js'
 import { FormattedText as Text } from '../../modules/UI/components/FormattedText/FormattedText.ui.js'
 import { connect } from '../../types/reactRedux.js'
-import { ResolutionError, ResolutionErrorCode } from '../../types/ResolutionError.js'
+import { ResolutionError } from '../../types/ResolutionError.js'
 import type { FioAddress, FlatListItem } from '../../types/types.js'
 import { type Theme, type ThemeProps, cacheStyles, withTheme } from '../services/ThemeContext.js'
 import { MainButton } from '../themed/MainButton.js'
@@ -38,8 +38,7 @@ type StateProps = {
   userFioAddresses: FioAddress[],
   userFioAddressesLoading: boolean,
   coreWallet: EdgeCurrencyWallet,
-  fioPlugin?: EdgeCurrencyConfig,
-  fioWallets: EdgeCurrencyWallet[]
+  fioPlugin?: EdgeCurrencyConfig
 }
 
 type DispatchProps = {
@@ -150,18 +149,18 @@ class AddressModalComponent extends React.Component<Props, State> {
   fetchDomain = async (domain: string, currencyTicker: string): Promise<string> => {
     domain = domain.trim().toLowerCase()
     if (!this.checkIfDomain(domain)) {
-      throw new ResolutionError(ResolutionErrorCode.UnsupportedDomain, { domain })
+      throw new ResolutionError('UnsupportedDomain', { domain })
     }
     const baseurl = `https://unstoppabledomains.com/api/v1`
     const url = this.checkIfEnsDomain(domain) ? `${baseurl}/${domain}/${currencyTicker}` : `${baseurl}/${domain}`
     const response = await global.fetch(url).then(res => res.json())
     const { addresses, meta } = response
     if (!meta || !meta.owner) {
-      throw new ResolutionError(ResolutionErrorCode.UnregisteredDomain, { domain })
+      throw new ResolutionError('UnregisteredDomain', { domain })
     }
     const ticker = currencyTicker.toUpperCase()
     if (!addresses || !addresses[ticker]) {
-      throw new ResolutionError(ResolutionErrorCode.UnspecifiedCurrency, { domain, currencyTicker })
+      throw new ResolutionError('UnspecifiedCurrency', { domain, currencyTicker })
     }
     return addresses[ticker]
   }
@@ -216,11 +215,8 @@ class AddressModalComponent extends React.Component<Props, State> {
       }
       this.fioCheckQueue = 0
       try {
-        const { fioPlugin, fioWallets } = this.props
+        const { fioPlugin } = this.props
         if (!fioPlugin) return
-        if (await checkExpiredFioAddress(fioWallets[0], fioAddress)) {
-          return this.setState({ fieldError: s.strings.fio_address_expired })
-        }
         const doesAccountExist = await fioPlugin.otherMethods.doesAccountExist(fioAddress)
         this.setStatusLabel(s.strings.fragment_send_address)
         if (!doesAccountExist) {
@@ -373,8 +369,7 @@ export const AddressModal = connect<StateProps, DispatchProps, OwnProps>(
     coreWallet: state.core.account.currencyWallets[ownProps.walletId],
     userFioAddresses: state.ui.scenes.fioAddress.fioAddresses,
     userFioAddressesLoading: state.ui.scenes.fioAddress.fioAddressesLoading,
-    fioPlugin: state.core.account.currencyConfig[CURRENCY_PLUGIN_NAMES.FIO],
-    fioWallets: state.ui.wallets.fioWallets
+    fioPlugin: state.core.account.currencyConfig.fio
   }),
   dispatch => ({
     refreshAllFioAddresses() {

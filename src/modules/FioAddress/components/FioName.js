@@ -12,23 +12,36 @@ import s from '../../../locales/strings.js'
 
 type FioNameProps = {
   name: string,
-  expiration: string,
+  expiration?: string,
+  bundledTxs?: string,
   icon: React.Node,
   onPress: () => void
 }
 
 const FioName = (props: FioNameProps & ThemeProps) => {
-  const { name, expiration, onPress, icon, theme } = props
+  const { name, expiration, bundledTxs, onPress, icon, theme } = props
   const styles = getStyles(theme)
 
-  const subTitle = `${s.strings.fio_address_details_screen_expires} ${formatDate(new Date(expiration))}`
+  const renderSubTitle = () => {
+    if (expiration != null) {
+      const subTitle = `${s.strings.fio_address_details_screen_expires} ${formatDate(new Date(expiration))}`
+      return <EdgeText style={styles.infoSubtitle}>{subTitle}</EdgeText>
+    }
+
+    if (bundledTxs != null) {
+      const subTitle = `${s.strings.fio_address_details_screen_bundled_txs}: ${bundledTxs}`
+      return <EdgeText style={styles.infoSubtitle}>{subTitle}</EdgeText>
+    }
+
+    return null
+  }
 
   return (
     <ClickableRow onPress={() => onPress()}>
       <View style={styles.icon}>{icon}</View>
       <View style={styles.info}>
         <EdgeText style={styles.infoTitle}>{name}</EdgeText>
-        <EdgeText style={styles.infoSubtitle}>{subTitle}</EdgeText>
+        {renderSubTitle()}
       </View>
       <View style={styles.arrow}>
         <FontAwesomeIcon name="angle-right" size={theme.rem(1.5)} color={theme.icon} />

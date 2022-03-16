@@ -5,6 +5,7 @@ import {
   type EdgeAccount,
   type EdgeContext,
   type EdgeCurrencyWallet,
+  type EdgeDenomination,
   type EdgeLobby,
   type EdgeParsedUri,
   type EdgeReceiveAddress,
@@ -18,7 +19,7 @@ import { type PermissionsState } from '../reducers/PermissionsReducer.js'
 import type { AccountActivationPaymentInfo, HandleActivationInfo, HandleAvailableStatus } from '../reducers/scenes/CreateWalletReducer.js'
 import { type AccountInitPayload, type SettingsState } from '../reducers/scenes/SettingsReducer.js'
 import { type TweakSource } from '../util/ReferralHelpers.js'
-import { type DeepLink } from './DeepLink.js'
+import { type DeepLink } from './DeepLinkTypes.js'
 import { type AccountReferral, type DeviceReferral, type Promotion, type ReferralCache } from './ReferralTypes.js'
 import {
   type CustomTokenInfo,
@@ -30,7 +31,6 @@ import {
   type GuiExchangeRates,
   type GuiMakeSpendInfo,
   type GuiSwapInfo,
-  type GuiWallet,
   type MostRecentWallet,
   type SpendAuthType,
   type SpendingLimits,
@@ -70,9 +70,6 @@ type NoDataActionName =
   | 'TOGGLE_ENABLE_TORCH'
   | 'UI/SEND_CONFIRMATION/RESET'
   | 'UI/SEND_CONFIRMATION/TOGGLE_CRYPTO_ON_TOP'
-  | 'UI/WALLETS/CREATE_WALLET_FAILURE'
-  | 'UI/WALLETS/CREATE_WALLET_START'
-  | 'UI/WALLETS/CREATE_WALLET_SUCCESS'
   | 'USE_LEGACY_REQUEST_ADDRESS'
   | 'USE_REGULAR_REQUEST_ADDRESS'
   | 'FIO/EXPIRED_REMINDER_SHOWN'
@@ -150,7 +147,7 @@ export type Action =
         balanceMessage: string,
         currencyCode: string,
         primaryInfo: GuiCurrencyInfo,
-        wallet: GuiWallet,
+        walletId: string,
         symbolImage: string,
         symbolImageDarkMono: string
       }
@@ -202,7 +199,7 @@ export type Action =
   | { type: 'UI/SETTINGS/SET_ACCOUNT_BALANCE_VISIBILITY', data: { isAccountBalanceVisible: boolean } }
   | { type: 'UI/SETTINGS/SET_AUTO_LOGOUT_TIME', data: { autoLogoutTimeInSeconds: number } }
   | { type: 'UI/SETTINGS/SET_DEFAULT_FIAT', data: { defaultFiat: string } }
-  | { type: 'UI/SETTINGS/SET_DENOMINATION_KEY', data: { currencyCode: string, denominationKey: string } }
+  | { type: 'UI/SETTINGS/SET_DENOMINATION_KEY', data: { pluginId: string, currencyCode: string, denomination: EdgeDenomination } }
   | { type: 'UI/SETTINGS/SET_MOST_RECENT_WALLETS', data: { mostRecentWallets: MostRecentWallet[] } }
   | { type: 'UI/SETTINGS/SET_PREFERRED_SWAP_PLUGIN', data: string | void }
   | { type: 'UI/SETTINGS/SET_SETTINGS_LOCK', data: boolean }

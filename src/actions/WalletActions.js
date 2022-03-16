@@ -15,7 +15,7 @@ import { type Dispatch, type GetState } from '../types/reduxTypes.js'
 import { Actions } from '../types/routerTypes.js'
 import { type CustomTokenInfo } from '../types/types.js'
 import { getCurrencyInfos, makeCreateWalletType } from '../util/CurrencyInfoHelpers.js'
-import { getReceiveAddresses, getSupportedFiats, mergeTokens } from '../util/utils.js'
+import { getReceiveAddresses, getSupportedFiats, logPrefix, mergeTokens } from '../util/utils.js'
 import { addTokenAsync } from './AddTokenActions.js'
 import { updateExchangeRates } from './ExchangeRateActions.js'
 import { refreshConnectedWallets } from './FioActions.js'
@@ -46,7 +46,7 @@ export const selectWallet = (walletId: string, currencyCode: string, alwaysActiv
   if (wallet.paused) wallet.changePaused(false).catch(showError)
 
   dispatch(updateMostRecentWalletsSelected(walletId, currencyCode))
-  const { isAccountActivationRequired } = getSpecialCurrencyInfo(currencyCode)
+  const { isAccountActivationRequired } = getSpecialCurrencyInfo(wallet.currencyInfo.pluginId)
   if (isAccountActivationRequired) {
     // EOS needs different path in case not activated yet
     const currentWalletId = state.ui.wallets.selectedWalletId
@@ -74,12 +74,18 @@ export const selectWallet = (walletId: string, currencyCode: string, alwaysActiv
 }
 
 // check if the EOS wallet is activated (via public address blank string check) and route to activation scene(s)
-const selectEOSWallet = (walletId: string, currencyCode: string) => (dispatch: Dispatch, getState: GetState) => {
+const selectEOSWallet = (walletId: string, currencyCode: string) => async (dispatch: Dispatch, getState: GetState) => {
   const state = getState()
-  const guiWallet = state.ui.wallets.byId[walletId]
-  const { publicAddress } = guiWallet.receiveAddress
+  const wallet = state.core.account.currencyWallets[walletId]
+  const {
+    fiatCurrencyCode,
+    name,
+    currencyInfo: { currencyCode, pluginId }
+  } = wallet
+  const walletName = name ?? ''
+  const { publicAddress } = await wallet.getReceiveAddress()
 
-  if (publicAddress) {
+  if (publicAddress !== '') {
     // already activated
     dispatch({
       type: 'UI/WALLETS/SELECT_WALLET',
@@ -92,23 +98,23 @@ const selectEOSWallet = (walletId: string, currencyCode: string) => (dispatch: D
     // not activated yet
     // find fiat and crypto (EOSIO) types and populate scene props
     const supportedFiats = getSupportedFiats()
-    const fiatTypeIndex = supportedFiats.findIndex(fiatType => fiatType.value === guiWallet.fiatCurrencyCode)
+    const fiatTypeIndex = supportedFiats.findIndex(fiatType => fiatType.value === fiatCurrencyCode.replace('iso:', ''))
     const selectedFiat = supportedFiats[fiatTypeIndex]
     const currencyInfos = getCurrencyInfos(state.core.account)
     const currencyInfo = currencyInfos.find(info => info.currencyCode === currencyCode)
     if (!currencyInfo) throw new Error('CannotFindCurrencyInfo')
     const selectedWalletType = makeCreateWalletType(currencyInfo)
-    const specialCurrencyInfo = getSpecialCurrencyInfo(currencyCode)
+    const specialCurrencyInfo = getSpecialCurrencyInfo(pluginId)
     if (specialCurrencyInfo.skipAccountNameValidation) {
       Actions.push(CREATE_WALLET_ACCOUNT_SELECT, {
         selectedFiat: selectedFiat,
         selectedWalletType,
-        accountName: guiWallet.name,
+        accountName: walletName,
         existingWalletId: walletId
       })
     } else {
       const createWalletAccountSetupSceneProps = {
-        accountHandle: guiWallet.name,
+        accountHandle: '',
         selectedWalletType,
         selectedFiat,
         isReactivation: true,
@@ -121,7 +127,7 @@ const selectEOSWallet = (walletId: string, currencyCode: string) => (dispatch: D
       <ButtonsModal
         bridge={bridge}
         title={s.strings.create_wallet_account_unfinished_activation_title}
-        message={sprintf(s.strings.create_wallet_account_unfinished_activation_message, guiWallet.currencyCode)}
+        message={sprintf(s.strings.create_wallet_account_unfinished_activation_message, currencyCode)}
         buttons={{ ok: { label: s.strings.string_ok } }}
       />
     ))
@@ -151,18 +157,22 @@ export const refreshWallet = (walletId: string) => (dispatch: Dispatch, getState
   const { currencyWallets } = state.core.account
   const wallet = currencyWallets[walletId]
   if (wallet) {
+    const prefix = logPrefix(wallet)
+
     if (!refreshDetails.delayUpsert) {
       const now = Date.now()
       if (now - refreshDetails.lastUpsert > upsertFrequency) {
         dispatchUpsertWallets(dispatch, [wallet])
         refreshDetails.lastUpsert = Date.now()
       } else {
-        console.log('refreshWallets setTimeout delay upsert id:' + walletId)
+        console.log(`${prefix}: refreshWallets setTimeout delay upsert`)
         refreshDetails.delayUpsert = true
         refreshDetails.walletIds[walletId] = wallet
         setTimeout(() => {
           const wallets = []
           for (const wid of Object.keys(refreshDetails.walletIds)) {
+            const w = refreshDetails.walletIds[wid]
+            console.log(`${logPrefix(w)}: refreshWallets upserting now`)
             wallets.push(refreshDetails.walletIds[wid])
           }
           dispatchUpsertWallets(dispatch, wallets)
@@ -174,10 +184,10 @@ export const refreshWallet = (walletId: string) => (dispatch: Dispatch, getState
     } else {
       // Add wallet to the queue to upsert
       refreshDetails.walletIds[walletId] = wallet
-      console.log('refreshWallets delayUpsert id:' + walletId)
+      console.log(`${prefix}: refreshWallets delayUpsert`)
     }
   } else {
-    console.log('refreshWallets no wallet. id:' + walletId)
+    console.log(`${walletId.slice(0, 2)} refreshWallets no wallet`)
   }
 }
 

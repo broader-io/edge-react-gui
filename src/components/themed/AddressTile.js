@@ -7,15 +7,16 @@ import { AppState, TouchableOpacity, View } from 'react-native'
 import FontAwesome from 'react-native-vector-icons/FontAwesome'
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5'
 
-import { CURRENCY_PLUGIN_NAMES } from '../../constants/WalletAndCurrencyConstants'
+import { launchBitPay } from '../../actions/BitPayActions.js'
+import { addressWarnings } from '../../actions/ScanActions.js'
 import s from '../../locales/strings.js'
-import { checkExpiredFioAddress, checkPubAddress } from '../../modules/FioAddress/util'
+import { checkPubAddress } from '../../modules/FioAddress/util'
+import { BitPayError } from '../../types/BitPayError.js'
 import { connect } from '../../types/reactRedux.js'
 import { type GuiMakeSpendInfo } from '../../types/types.js'
+import { parseDeepLink } from '../../util/DeepLinkParser.js'
 import { AddressModal } from '../modals/AddressModal'
-import { paymentProtocolUriReceived } from '../modals/paymentProtocolUriReceived.js'
 import { ScanModal } from '../modals/ScanModal.js'
-import { shouldContinueLegacy } from '../modals/shouldContinueLegacy.js'
 import { Airship, showError } from '../services/AirshipInstance'
 import { type Theme, type ThemeProps, cacheStyles, withTheme } from '../services/ThemeContext.js'
 import { EdgeText } from './EdgeText'
@@ -34,23 +35,13 @@ type OwnProps = {
   fioToAddress?: string
 }
 type StateProps = {
-  fioPlugin?: EdgeCurrencyConfig,
-  fioWallets: EdgeCurrencyWallet[]
+  fioPlugin?: EdgeCurrencyConfig
 }
 type State = {
   clipboard: string,
   loading: boolean
 }
 type Props = OwnProps & StateProps & ThemeProps
-
-const isLegacyAddressUri = (parsedUri: EdgeParsedUri): boolean => {
-  return !!parsedUri.legacyAddress
-}
-
-const isPaymentProtocolUri = (parsedUri: EdgeParsedUri): boolean => {
-  // $FlowFixMe should be paymentProtocolUrl (lowercased)?
-  return !!parsedUri.paymentProtocolURL && !parsedUri.publicAddress
-}
 
 class AddressTileComponent extends React.PureComponent<Props, State> {
   constructor(props: Props) {
@@ -88,17 +79,6 @@ class AddressTileComponent extends React.PureComponent<Props, State> {
     if (appState === 'active') this._setClipboard(this.props)
   }
 
-  reset() {
-    this._setClipboard(this.props)
-    this.props.resetSendTransaction()
-  }
-
-  checkIfFioAddressExpired = async (address: string) => {
-    if (await checkExpiredFioAddress(this.props.fioWallets[0], address)) {
-      throw new Error(s.strings.fio_address_expired)
-    }
-  }
-
   onChangeAddress = async (address: string) => {
     if (!address) return
     const { onChangeAddress, coreWallet, currencyCode, fioPlugin } = this.props
@@ -107,7 +87,6 @@ class AddressTileComponent extends React.PureComponent<Props, State> {
     let fioAddress
     if (fioPlugin) {
       try {
-        await this.checkIfFioAddressExpired(address)
         const publicAddress = await checkPubAddress(fioPlugin, address.toLowerCase(), coreWallet.currencyInfo.currencyCode, currencyCode)
         fioAddress = address.toLowerCase()
         address = publicAddress
@@ -123,18 +102,15 @@ class AddressTileComponent extends React.PureComponent<Props, State> {
 
       this.setState({ loading: false })
 
-      if (isLegacyAddressUri(parsedUri)) {
-        if (!(await shouldContinueLegacy())) return
-      }
+      // Check if the URI requires a warning to the user
+      const approved = await addressWarnings(parsedUri, currencyCode)
+      if (!approved) return
 
       // Missing isPrivateKeyUri Modal
 
-      if (isPaymentProtocolUri(parsedUri)) {
-        const guiMakeSpendInfo: ?GuiMakeSpendInfo = await paymentProtocolUriReceived(parsedUri, coreWallet)
-
-        if (guiMakeSpendInfo) {
-          onChangeAddress(guiMakeSpendInfo)
-        }
+      // Check is PaymentProtocolUri
+      if (!!parsedUri.paymentProtocolURL && !parsedUri.publicAddress) {
+        await launchBitPay(parsedUri.paymentProtocolURL, { wallet: coreWallet }).catch(showError)
 
         return
       }
@@ -146,7 +122,18 @@ class AddressTileComponent extends React.PureComponent<Props, State> {
       // set address
       onChangeAddress({ fioAddress, isSendUsingFioAddress: !!fioAddress }, parsedUri)
     } catch (e) {
-      showError(`${s.strings.scan_invalid_address_error_title} ${s.strings.scan_invalid_address_error_description}`)
+      const currencyInfo = coreWallet.currencyInfo
+      const ercTokenStandard = currencyInfo.defaultSettings?.otherSettings?.ercTokenStandard ?? ''
+      if (parseDeepLink(address).type === 'bitPay') {
+        if (ercTokenStandard === 'ERC20') {
+          showError(new BitPayError('CurrencyNotSupported', { text: currencyInfo.currencyCode }))
+        } else {
+          await launchBitPay(address, { wallet: coreWallet }).catch(showError)
+        }
+      } else {
+        showError(`${s.strings.scan_invalid_address_error_title} ${s.strings.scan_invalid_address_error_description}`)
+      }
+
       this.setState({ loading: false })
     }
   }
@@ -204,7 +191,8 @@ class AddressTileComponent extends React.PureComponent<Props, State> {
   handleTilePress = () => {
     const { lockInputs, recipientAddress } = this.props
     if (!lockInputs && !!recipientAddress) {
-      this.reset()
+      this._setClipboard(this.props)
+      this.props.resetSendTransaction()
     }
   }
 
@@ -268,8 +256,7 @@ const getStyles = cacheStyles((theme: Theme) => ({
 const AddressTileConnector = connect<StateProps, {}, OwnProps>(
   state => ({
     fioToAddress: state.ui.scenes.sendConfirmation.guiMakeSpendInfo?.fioAddress,
-    fioPlugin: state.core.account.currencyConfig[CURRENCY_PLUGIN_NAMES.FIO],
-    fioWallets: state.ui.wallets.fioWallets
+    fioPlugin: state.core.account.currencyConfig.fio
   }),
   dispatch => ({})
 )(withTheme(AddressTileComponent))

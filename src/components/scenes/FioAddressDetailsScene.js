@@ -5,10 +5,9 @@ import * as React from 'react'
 import { Alert } from 'react-native'
 import IonIcon from 'react-native-vector-icons/Ionicons'
 
-import { formatDate } from '../../locales/intl.js'
 import s from '../../locales/strings.js'
 import { ConnectWalletsConnector as ConnectWallets } from '../../modules/FioAddress/components/ConnectWallets'
-import { alreadyExpired, expiredSoon, findWalletByFioAddress } from '../../modules/FioAddress/util'
+import { BUNDLED_TXS_AMOUNT_ALERT, findWalletByFioAddress } from '../../modules/FioAddress/util'
 import { connect } from '../../types/reactRedux.js'
 import { type NavigationProp, type RouteProp } from '../../types/routerTypes.js'
 import { SceneWrapper } from '../common/SceneWrapper'
@@ -62,34 +61,35 @@ class FioAddressDetails extends React.Component<Props, LocalState> {
 
   _onPressAccountSettings = (): void => {
     const { navigation, route } = this.props
-    const { fioAddressName, expiration } = route.params
+    const { fioAddressName, bundledTxs } = route.params
     const { fioWallet } = this.state
     if (fioWallet) {
       navigation.navigate('fioAddressSettings', {
         fioWallet,
         fioAddressName,
-        expiration,
-        refreshAfterRenew: true
+        bundledTxs,
+        refreshAfterAddBundledTxs: true
       })
     } else {
       showError(s.strings.fio_wallet_missing_for_fio_address)
     }
   }
 
-  checkExpiredSoon = (): boolean => expiredSoon(this.props.route.params.expiration)
-
-  checkAlreadyExpired = (): boolean => alreadyExpired(this.props.route.params.expiration)
-
   renderAccountSettings = () => {
-    const { theme } = this.props
+    const {
+      theme,
+      route: {
+        params: { bundledTxs }
+      }
+    } = this.props
     const styles = getStyles(theme)
 
-    if (this.checkExpiredSoon()) {
+    if (bundledTxs < BUNDLED_TXS_AMOUNT_ALERT) {
       return (
         <SettingsTappableRow onPress={this._onPressAccountSettings}>
           <IonIcon name="ios-warning" color={theme.warningIcon} style={styles.settingsIcon} />
-          <EdgeText style={styles.settingsWarning}>
-            {this.checkAlreadyExpired() ? s.strings.fio_address_details_already_expired : s.strings.fio_address_details_expired_soon}
+          <EdgeText style={styles.settingsWarning} numberOfLines={4}>
+            {!bundledTxs ? s.strings.fio_address_details_no_bundled_txs : s.strings.fio_address_details_bundled_txs_out_soon}
           </EdgeText>
         </SettingsTappableRow>
       )
@@ -104,13 +104,13 @@ class FioAddressDetails extends React.Component<Props, LocalState> {
 
   render() {
     const { theme, route } = this.props
-    const { fioAddressName, expiration } = route.params
+    const { fioAddressName, bundledTxs } = route.params
     const styles = getStyles(theme)
-    const expirationLabel = `${s.strings.fio_address_details_screen_expires} ${formatDate(new Date(expiration))}`
+    const bundledTxsLabel = `${s.strings.fio_address_details_screen_bundled_txs}: ${bundledTxs}`
 
     return (
       <SceneWrapper background="header">
-        <EdgeText style={styles.expiration}>{expirationLabel}</EdgeText>
+        <EdgeText style={styles.bundledTxs}>{bundledTxsLabel}</EdgeText>
         {this.renderAccountSettings()}
         <SettingsHeaderRow
           icon={<IonIcon name="ios-link" color={theme.primaryText} size={theme.rem(1.5)} />}
@@ -127,7 +127,7 @@ const getStyles = cacheStyles((theme: Theme) => ({
     color: theme.primaryText,
     fontSize: theme.rem(1)
   },
-  expiration: {
+  bundledTxs: {
     fontSize: theme.rem(0.75),
     color: theme.primaryText,
     textAlign: 'center',
@@ -139,9 +139,10 @@ const getStyles = cacheStyles((theme: Theme) => ({
     paddingHorizontal: theme.rem(0.5)
   },
   settingsWarning: {
-    fontSize: theme.rem(1),
+    fontSize: theme.rem(0.75),
     color: theme.warningText,
-    paddingHorizontal: theme.rem(0.5)
+    paddingLeft: theme.rem(0.5),
+    width: '75%'
   }
 }))
 

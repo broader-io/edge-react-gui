@@ -8,18 +8,19 @@ import URL from 'url-parse'
 
 import { selectWalletForExchange } from '../actions/CryptoExchangeActions.js'
 import { ButtonsModal } from '../components/modals/ButtonsModal.js'
+import { ConfirmContinueModal } from '../components/modals/ConfirmContinueModal.js'
 import { paymentProtocolUriReceived } from '../components/modals/paymentProtocolUriReceived.js'
-import { shouldContinueLegacy } from '../components/modals/shouldContinueLegacy.js'
 import { Airship, showError } from '../components/services/AirshipInstance'
 import { ADD_TOKEN, EXCHANGE_SCENE, PLUGIN_BUY, SEND } from '../constants/SceneKeys.js'
-import { CURRENCY_PLUGIN_NAMES, getSpecialCurrencyInfo } from '../constants/WalletAndCurrencyConstants.js'
+import { getSpecialCurrencyInfo } from '../constants/WalletAndCurrencyConstants.js'
 import s from '../locales/strings.js'
 import { checkPubAddress } from '../modules/FioAddress/util'
-import { type ReturnAddressLink, parseDeepLink } from '../types/DeepLink.js'
+import { type ReturnAddressLink } from '../types/DeepLinkTypes.js'
 import type { Dispatch, GetState } from '../types/reduxTypes.js'
 import { Actions } from '../types/routerTypes.js'
 import { type GuiMakeSpendInfo, type GuiWallet } from '../types/types.js'
-import { denominationToDecimalPlaces, noOp, zeroString } from '../util/utils.js'
+import { parseDeepLink } from '../util/DeepLinkParser.js'
+import { denominationToDecimalPlaces, zeroString } from '../util/utils.js'
 import { launchDeepLink } from './DeepLinkingActions.js'
 
 export const doRequestAddress = (dispatch: Dispatch, edgeWallet: EdgeCurrencyWallet, guiWallet: GuiWallet, link: ReturnAddressLink) => {
@@ -72,6 +73,32 @@ export const doRequestAddress = (dispatch: Dispatch, edgeWallet: EdgeCurrencyWal
   }
 }
 
+export const addressWarnings = async (parsedUri: any, currencyCode: string) => {
+  let approve = true
+  // Warn the user if the URI is a Gateway/Bridge URI
+  if (parsedUri?.metadata?.gateway === true) {
+    approve =
+      approve &&
+      (await Airship.show(bridge => (
+        <ConfirmContinueModal
+          bridge={bridge}
+          title={sprintf(s.strings.gateway_agreement_modal_title, currencyCode)}
+          body={s.strings.gateway_agreement_modal_body}
+          isSkippable
+        />
+      )))
+  }
+  // Warn the user if the Address is a legacy type
+  if (parsedUri.legacyAddress != null) {
+    approve =
+      approve &&
+      (await Airship.show(bridge => (
+        <ConfirmContinueModal bridge={bridge} title={s.strings.legacy_address_modal_title} body={s.strings.legacy_address_modal_warning} isSkippable />
+      )))
+  }
+  return approve
+}
+
 export const parseScannedUri = (data: string, customErrorTitle?: string, customErrorDescription?: string) => async (dispatch: Dispatch, getState: GetState) => {
   if (!data) return
   const state = getState()
@@ -88,7 +115,7 @@ export const parseScannedUri = (data: string, customErrorTitle?: string, customE
 
   let fioAddress
   if (account && account.currencyConfig) {
-    const fioPlugin = account.currencyConfig[CURRENCY_PLUGIN_NAMES.FIO]
+    const fioPlugin = account.currencyConfig.fio
     const currencyCode: string = state.ui.wallets.selectedCurrencyCode
     try {
       const publicAddress = await checkPubAddress(fioPlugin, data.toLowerCase(), coreWallet.currencyInfo.currencyCode, currencyCode)
@@ -114,6 +141,8 @@ export const parseScannedUri = (data: string, customErrorTitle?: string, customE
           console.log(e)
         }
         break
+      case 'edgeLogin':
+      case 'bitPay':
       default:
         dispatch(launchDeepLink(deepLink))
         return
@@ -122,9 +151,14 @@ export const parseScannedUri = (data: string, customErrorTitle?: string, customE
     return showError(error)
   }
 
+  // Coin operations
   try {
     const parsedUri: EdgeParsedUri & { paymentProtocolURL?: string } = await edgeWallet.parseUri(data, currencyCode)
     dispatch({ type: 'PARSE_URI_SUCCEEDED', data: { parsedUri } })
+
+    // Check if the URI requires a warning to the user
+    const approved = await addressWarnings(parsedUri, currencyCode)
+    if (!approved) return dispatch({ type: 'ENABLE_SCAN' })
 
     if (parsedUri.token) {
       // TOKEN URI
@@ -142,25 +176,20 @@ export const parseScannedUri = (data: string, customErrorTitle?: string, customE
         currencyCode,
         currencyName,
         decimalPlaces,
-        walletId: selectedWalletId,
-        onAddToken: noOp
+        walletId: selectedWalletId
       }
 
       return Actions.push(ADD_TOKEN, parameters)
     }
 
+    // LEGACY ADDRESS URI
     if (parsedUri.legacyAddress != null) {
-      // LEGACY ADDRESS URI
-      if (await shouldContinueLegacy()) {
-        const guiMakeSpendInfo: GuiMakeSpendInfo = { ...parsedUri }
-        Actions.push(SEND, {
-          guiMakeSpendInfo,
-          selectedWalletId,
-          selectedCurrencyCode: currencyCode
-        })
-      } else {
-        dispatch({ type: 'ENABLE_SCAN' })
-      }
+      const guiMakeSpendInfo: GuiMakeSpendInfo = { ...parsedUri }
+      Actions.push(SEND, {
+        guiMakeSpendInfo,
+        selectedWalletId,
+        selectedCurrencyCode: currencyCode
+      })
 
       return
     }
@@ -235,22 +264,6 @@ export const parseScannedUri = (data: string, customErrorTitle?: string, customE
   }
 }
 
-export const loginQrCodeScanned = (data: string) => (dispatch: Dispatch, getState: GetState) => {
-  const state = getState()
-  const isScanEnabled = state.ui.scenes.scan.scanEnabled
-
-  if (!isScanEnabled || !data) return
-
-  const deepLink = parseDeepLink(data)
-
-  if (deepLink.type === 'edgeLogin') {
-    dispatch({ type: 'DISABLE_SCAN' })
-    dispatch(launchDeepLink(deepLink))
-  } else {
-    showError(s.strings.scan_login_error)
-  }
-}
-
 export const qrCodeScanned = (data: string) => (dispatch: Dispatch, getState: GetState) => {
   const state = getState()
   const isScanEnabled = state.ui.scenes.scan.scanEnabled
@@ -302,14 +315,14 @@ export const checkAndShowGetCryptoModal = (selectedWalletId?: string, selectedCu
   try {
     const state = getState()
     const currencyCode = selectedCurrencyCode ?? state.ui.wallets.selectedCurrencyCode
-    const wallets = state.ui.wallets.byId
-    const wallet = wallets[selectedWalletId || state.ui.wallets.selectedWalletId]
+    const { currencyWallets } = state.core.account
+    const wallet: EdgeCurrencyWallet = currencyWallets[selectedWalletId ?? state.ui.wallets.selectedWalletId]
     // check if balance is zero
-    const balance = wallet.nativeBalances[currencyCode]
+    const balance = wallet.balances[currencyCode]
     if (!zeroString(balance) || shownWalletGetCryptoModals.includes(wallet.id)) return // if there's a balance then early exit
     shownWalletGetCryptoModals.push(wallet.id) // add to list of wallets with modal shown this session
     let threeButtonModal
-    const { displayBuyCrypto } = getSpecialCurrencyInfo(currencyCode)
+    const { displayBuyCrypto } = getSpecialCurrencyInfo(wallet.currencyInfo.pluginId)
     if (displayBuyCrypto) {
       const messageSyntax = sprintf(s.strings.buy_crypto_modal_message, currencyCode, currencyCode, currencyCode)
       threeButtonModal = await Airship.show(bridge => (

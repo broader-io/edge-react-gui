@@ -1,7 +1,5 @@
 // @flow
 
-import { Platform } from 'react-native'
-
 import ENV from '../../env.json'
 
 // Shim old-format env.json files:
@@ -30,6 +28,7 @@ if (ENV.CHANGE_NOW_INIT == null && ENV.CHANGE_NOW_API_KEY) {
 export const currencyPlugins = {
   // edge-currency-accountbased:
   binance: true,
+  binancesmartchain: ENV.BINANCE_SMART_CHAIN_INIT,
   hedera: true,
   eos: true,
   telos: true,
@@ -38,10 +37,14 @@ export const currencyPlugins = {
   ethereumclassic: true,
   fantom: ENV.FANTOM_INIT,
   fio: ENV.FIO_INIT || true,
+  polygon: ENV.POLYGON_INIT,
+  avalanche: true,
   ripple: true,
   rsk: true,
   stellar: true,
   tezos: true,
+  solana: true,
+  celo: true,
   // edge-currency-bitcoin:
   bitcoin: true,
   bitcoincash: true,
@@ -65,7 +68,7 @@ export const currencyPlugins = {
   zcoin: true,
   // edge-currency-monero:
   monero: ENV.MONERO_INIT,
-  zcash: Platform.OS === 'android'
+  zcash: true
 }
 
 export const ratePlugins = {
@@ -87,6 +90,7 @@ export const ratePlugins = {
 export const swapPlugins = {
   changelly: ENV.CHANGELLY_INIT,
   changenow: ENV.CHANGE_NOW_INIT,
+  exolix: ENV.EXOLIX_INIT,
   foxExchange: ENV.FOX_INIT,
   godex: ENV.GODEX_INIT,
   // shapeshift: ENV.SHAPESHIFT_INIT,

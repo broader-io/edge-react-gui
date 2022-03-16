@@ -1,6 +1,7 @@
 // @flow
 
 import type { Disklet } from 'disklet'
+import { type EdgeCurrencyWallet } from 'edge-core-js'
 import * as React from 'react'
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native'
 import SortableListView from 'react-native-sortable-listview'
@@ -8,7 +9,6 @@ import SortableListView from 'react-native-sortable-listview'
 import { updateActiveWalletsOrder } from '../../actions/WalletListActions.js'
 import s from '../../locales/strings.js'
 import { connect } from '../../types/reactRedux.js'
-import { type GuiWallet } from '../../types/types.js'
 import { getWalletListSlideTutorial, setUserTutorialList } from '../../util/tutorial.js'
 import { CrossFade } from '../common/CrossFade.js'
 import { SceneWrapper } from '../common/SceneWrapper.js'
@@ -26,8 +26,7 @@ import { WiredProgressBar } from '../themed/WiredProgressBar.js'
 
 type StateProps = {
   activeWalletIds: string[],
-  userId: string,
-  wallets: { [walletId: string]: GuiWallet },
+  wallets: { [walletId: string]: EdgeCurrencyWallet },
   disklet: Disklet,
   needsPasswordCheck: boolean
 }
@@ -57,9 +56,9 @@ class WalletListComponent extends React.PureComponent<Props, State> {
   }
 
   showTutorial = async () => {
-    const { disklet, userId } = this.props
+    const { disklet } = this.props
     try {
-      const userTutorialList = await getWalletListSlideTutorial(userId, disklet)
+      const userTutorialList = await getWalletListSlideTutorial(disklet)
       const tutorialCount = userTutorialList.walletListSlideTutorialCount || 0
 
       if (tutorialCount < 2) {
@@ -145,8 +144,8 @@ class WalletListComponent extends React.PureComponent<Props, State> {
     )
   }
 
-  renderSortableRow = (guiWallet: GuiWallet | void) => {
-    return <WalletListSortableRow guiWallet={guiWallet} />
+  renderSortableRow = (wallet: EdgeCurrencyWallet | void) => {
+    return <WalletListSortableRow wallet={wallet} />
   }
 
   disableSorting = () => this.setState({ sorting: false })
@@ -190,6 +189,7 @@ const getStyles = cacheStyles((theme: Theme) => ({
 export const WalletListScene = connect<StateProps, DispatchProps, {}>(
   state => {
     let { activeWalletIds } = state.ui.wallets
+    const { currencyWallets } = state.core.account
 
     // FIO disable changes below
     if (global.isFioDisabled) {
@@ -202,8 +202,7 @@ export const WalletListScene = connect<StateProps, DispatchProps, {}>(
 
     return {
       activeWalletIds,
-      userId: state.core.account.id,
-      wallets: state.ui.wallets.byId,
+      wallets: currencyWallets,
       disklet: state.core.disklet,
       needsPasswordCheck: state.ui.passwordReminder.needsPasswordCheck
     }

@@ -12,13 +12,21 @@
       "symbol": "Ξ"
     }, {
       "multiplier": "10000000000000000000000000000000000000000000000000",
-      "name": "TKN",
-      "symbol": ""
+      "name": "TKN"
     }]
   },
   "getDisplayDenomination": {
     "title": "Display Denomination of",
-    "input": ["BTC", "ETH", "TKN"],
+    "input": [{
+        "pluginId": "bitcoin",
+        "currencyCode": "BTC"
+      }, {
+        "pluginId": "ethereum",
+        "currencyCode": "ETH"
+      }, {
+        "pluginId": "ethereum",
+        "currencyCode": "TKN"
+      }],
     "output": [{
       "multiplier": "1",
       "name": "sats",
@@ -29,9 +37,110 @@
       "symbol": "mΞ"
     }, {
       "multiplier": "10000000000000000000000000000000000000000000000000",
-      "name": "TKN",
-      "symbol": ""
+      "name": "TKN"
     }]
+  },
+  "currencyInfos": {
+    "BTC": {
+      "currencyCode": "BTC",
+      "pluginId": "bitcoin",
+      "denominations": [
+        { "name": "BTC", "multiplier": "100000000", "symbol": "₿" },
+        { "name": "mBTC", "multiplier": "100000", "symbol": "m₿" },
+        { "name": "bits", "multiplier": "100", "symbol": "ƀ" },
+        { "name": "sats", "multiplier": "1", "symbol": "s" }
+      ],
+      "metaTokens": []
+    },
+    "ETH": {
+      "currencyCode": "ETH",
+      "pluginId": "ethereum",
+      "denominations": [
+        {
+          "name": "ETH",
+          "multiplier": "1000000000000000000",
+          "symbol": "Ξ"
+        },
+        {
+          "name": "mETH",
+          "multiplier": "1000000000000000",
+          "symbol": "mΞ"
+        }
+      ],
+      "metaTokens": [
+        {
+          "currencyCode": "TKN",
+          "currencyName": "Augur",
+          "denominations": [
+           {
+              "name": "TKN",
+              "multiplier": "10000000000000000000000000000000000000000000000000"
+            }
+          ],
+          "contractAddress": "0x1985365e9f78359a9B6AD760e32412f4a445E862"
+        }
+      ]
+    }
+  },
+  "state": {
+    "ui": {
+      "settings": {
+        "denominationSettings": {
+          "bitcoin": {
+            "BTC": {
+              "multiplier": "1",
+              "name": "sats",
+              "symbol": "s"
+            }
+          },
+          "ethereum":{
+            "ETH": {
+              "multiplier": "1000000000000000",
+              "name": "mETH",
+              "symbol": "mΞ"
+            }
+          }
+        },
+        "customTokens": []
+      }
+    },
+    "core": {
+      "account": {
+        "currencyConfig": {
+          "ethereum": {
+            "currencyInfo" :{
+              "currencyCode": "ETH",
+              "pluginId": "ethereum",
+              "denominations": [
+                {
+                  "name": "ETH",
+                  "multiplier": "1000000000000000000",
+                  "symbol": "Ξ"
+                },
+                {
+                  "name": "mETH",
+                  "multiplier": "1000000000000000",
+                  "symbol": "mΞ"
+                }
+              ],
+              "metaTokens": [
+                {
+                  "currencyCode": "TKN",
+                  "currencyName": "Token",
+                  "denominations": [
+                    {
+                      "name": "TKN",
+                      "multiplier": "10000000000000000000000000000000000000000000000000"
+                    }
+                  ],
+                  "contractAddress": "0x1985365e9f78359a9B6AD760e32412f4a445E862"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
   },
   "precisionAdjust": {
     "BTC for precision adjustment and max conversion decimal": {
@@ -58,62 +167,6 @@
         "maxPrimaryCurrencyConversionDecimals": 7
       }
     }
-  },
-  "settings": {
-    "BTC": {
-      "currencyCode": "BTC",
-      "denomination": "1",
-      "displayName": "Bitcoin",
-      "denominations": [{
-        "multiplier": "100000000",
-        "name": "BTC",
-        "symbol": "₿"
-      }, {
-        "multiplier": "100000",
-        "name": "mBTC",
-        "symbol": "m₿"
-      }, {
-        "multiplier": "100",
-        "name": "bits",
-        "symbol": "ƀ"
-      }, {
-        "multiplier": "1",
-        "name": "sats",
-        "symbol": "s"
-      }],
-      "symbolImage": "https://content.edge.app/BTC/BTC.png",
-      "symbolImageDarkMono": "https://content.edge.app/BTC/BTC_dark.png"
-    },
-    "ETH": {
-      "currencyCode": "ETH",
-        "denomination": "1000000000000000",
-        "denominations": [{
-          "multiplier": "1000000000000000000",
-          "name": "ETH",
-          "symbol": "Ξ"
-        }, {
-          "multiplier": "1000000000000000",
-          "name": "mETH",
-          "symbol": "mΞ"
-        }],
-        "displayName": "Ethereum",
-        "symbolImage": "https://content.edge.app/ETH/ETH.png",
-        "symbolImageDarkMono": "https://content.edge.app/ETH/ETH_dark.png"
-    },
-    "customTokens": [{
-      "contractAddress": "0x0C658Fa2eAA292E8dcA085Dab0E5CBD2da21C494",
-      "currencyCode": "TKN",
-      "currencyName": "CustomToken",
-      "denomination": "10000000000000000000000000000000000000000000000000",
-      "denominations": [{
-        "multiplier": "10000000000000000000000000000000000000000000000000",
-        "name": "TKN",
-        "symbol": ""
-      }],
-      "isVisible": true,
-      "multiplier": "10000000000000000000000000000000000000000000000000",
-      "walletType": "wallet:ethereum"
-    }]
   },
   "zerosAfterDecimal": {
     "title": "Zeros after decimal place of",

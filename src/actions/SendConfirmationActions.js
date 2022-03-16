@@ -1,6 +1,6 @@
 // @flow
 
-import { bns } from 'biggystring'
+import { abs, div, mul, toFixed } from 'biggystring'
 import { type EdgeCurrencyWallet, type EdgeMetadata, type EdgeParsedUri, type EdgeTransaction, asMaybeInsufficientFundsError } from 'edge-core-js'
 import * as React from 'react'
 import { Alert } from 'react-native'
@@ -12,7 +12,7 @@ import { Airship, showError } from '../components/services/AirshipInstance.js'
 import { EXCHANGE_SCENE, PLUGIN_BUY, TRANSACTION_DETAILS } from '../constants/SceneKeys.js'
 import { FEE_ALERT_THRESHOLD, FIO_STR } from '../constants/WalletAndCurrencyConstants.js'
 import s from '../locales/strings.js'
-import { addToFioAddressCache, recordSend } from '../modules/FioAddress/util'
+import { addToFioAddressCache, FIO_FEE_EXCEEDS_SUPPLIED_MAXIMUM, recordSend } from '../modules/FioAddress/util'
 import { getAmountRequired, getAuthRequired, getSpendInfo, getSpendInfoWithoutState, getTransaction } from '../modules/UI/scenes/SendConfirmation/selectors'
 import { getExchangeDenomination } from '../selectors/DenominationSelectors.js'
 import { convertCurrencyFromExchangeRates, getExchangeRate } from '../selectors/WalletSelectors.js'
@@ -47,7 +47,7 @@ const updateAmount =
     selectedCurrencyCode?: string
   ) =>
   (dispatch: Dispatch, getState: GetState) => {
-    const amountFiatString: string = bns.mul(exchangeAmount, fiatPerCrypto)
+    const amountFiatString: string = mul(exchangeAmount, fiatPerCrypto)
     const amountFiat: number = parseFloat(amountFiatString)
     const metadata: EdgeMetadata = { amountFiat }
     dispatch(sendConfirmationUpdateTx({ nativeAmount, metadata }, forceUpdateGui, selectedWalletId, selectedCurrencyCode))
@@ -78,7 +78,7 @@ export const sendConfirmationUpdateTx =
         nativeAmount: spendTarget.nativeAmount === '' ? '0' : spendTarget.nativeAmount
       }))
     }
-    const authRequired = getAuthRequired(state, spendInfo)
+    const authRequired = getAuthRequired(state, spendInfo, walletId)
     dispatch({
       type: 'UI/SEND_CONFIRMATION/NEW_SPEND_INFO',
       data: { spendInfo, authRequired }
@@ -108,7 +108,7 @@ export const sendConfirmationUpdateTx =
         const insufficientFunds = asMaybeInsufficientFundsError(error)
         if (insufficientFunds != null && insufficientFunds.currencyCode != null && spendInfo.currencyCode !== insufficientFunds.currencyCode) {
           const { currencyCode, networkFee = '' } = insufficientFunds
-          const multiplier = getExchangeDenomination(state, currencyCode).multiplier
+          const multiplier = getExchangeDenomination(state, edgeWallet.currencyInfo.pluginId, currencyCode).multiplier
           const amountString = roundedFee(networkFee, 2, multiplier)
           const result = await Airship.show(bridge => (
             <ButtonsModal
@@ -159,13 +159,13 @@ export const updateMaxSpend =
       .then(nativeAmount => {
         const state = getState()
         const spendInfo = getSpendInfo(state, { nativeAmount }, selectedCurrencyCode)
-        const authRequired = getAuthRequired(state, spendInfo)
+        const authRequired = getAuthRequired(state, spendInfo, walletId)
 
         const wallets = state.ui.wallets.byId
         const guiWallet = wallets[walletId]
         const currencyCode = selectedCurrencyCode || state.ui.wallets.selectedCurrencyCode
         const isoFiatCurrencyCode = guiWallet.isoFiatCurrencyCode
-        const exchangeDenomination = getExchangeDenomination(state, currencyCode)
+        const exchangeDenomination = getExchangeDenomination(state, edgeWallet.currencyInfo.pluginId, currencyCode)
 
         const exchangeAmount = convertNativeToExchange(exchangeDenomination.multiplier)(nativeAmount)
         const fiatPerCrypto = getExchangeRate(state, currencyCode, isoFiatCurrencyCode)
@@ -200,11 +200,11 @@ export const signBroadcastAndSave =
     const guiWallet = wallets[walletId || state.ui.wallets.selectedWalletId]
     const currencyCode = selectedCurrencyCode || state.ui.wallets.selectedCurrencyCode
     const isoFiatCurrencyCode = guiWallet.isoFiatCurrencyCode
-    const exchangeDenomination = getExchangeDenomination(state, currencyCode)
+    const exchangeDenomination = getExchangeDenomination(state, wallet.currencyInfo.pluginId, currencyCode)
 
     const exchangeAmount = convertNativeToExchange(exchangeDenomination.multiplier)(edgeUnsignedTransaction.nativeAmount)
     const fiatPerCrypto = getExchangeRate(state, currencyCode, isoFiatCurrencyCode).toString()
-    const amountFiatString = bns.abs(bns.mul(exchangeAmount, fiatPerCrypto))
+    const amountFiatString = abs(mul(exchangeAmount, fiatPerCrypto))
     const amountFiat = parseFloat(amountFiatString)
 
     const spendInfo = state.ui.scenes.sendConfirmation.spendInfo
@@ -231,7 +231,7 @@ export const signBroadcastAndSave =
     }
 
     if (!spendInfo) throw new Error(s.strings.invalid_spend_request)
-    const authRequired = getAuthRequired(state, spendInfo)
+    const authRequired = getAuthRequired(state, spendInfo, selectedWalletId)
     const pin = state.ui.scenes.sendConfirmation.pin
 
     // check hwo high fee is and decide whether to display warninig
@@ -242,7 +242,7 @@ export const signBroadcastAndSave =
       const feeAmountInWalletFiat = convertCurrencyFromExchangeRates(state.exchangeRates, currencyCode, isoFiatCurrencyCode, cryptoFeeExchangeAmount)
       const fiatDenomination = getDenomFromIsoCode(guiWallet.fiatCurrencyCode)
       const fiatSymbol = fiatDenomination.symbol ? `${fiatDenomination.symbol} ` : ''
-      const feeString = `${fiatSymbol}${bns.toFixed(feeAmountInWalletFiat.toString(), 2, 2)}`
+      const feeString = `${fiatSymbol}${toFixed(feeAmountInWalletFiat.toString(), 2, 2)}`
       const feeAlertResponse = await displayFeeAlert(guiWallet.currencyCode, feeString)
       if (!feeAlertResponse) {
         dispatch({
@@ -306,9 +306,9 @@ export const signBroadcastAndSave =
 
       // fio
       if (fioSender != null) {
-        const { fioAddress, fioWallet, memo, skipRecord } = fioSender
-        if (payeeFioAddress && fioAddress && fioWallet) {
-          if (guiMakeSpendInfo.fioPendingRequest) {
+        const { fioAddress, fioWallet, memo, skipRecord = false } = fioSender
+        if (payeeFioAddress != null && fioAddress != null && fioWallet != null) {
+          if (guiMakeSpendInfo.fioPendingRequest != null) {
             const { fioPendingRequest: pendingRequest } = guiMakeSpendInfo
             try {
               await recordSend(fioWallet, fioAddress, {
@@ -323,21 +323,20 @@ export const signBroadcastAndSave =
                 memo
               })
             } catch (e) {
-              showError(e)
+              const message = e?.message ?? ''
+              message.includes(FIO_FEE_EXCEEDS_SUPPLIED_MAXIMUM) ? showError(s.strings.fio_fee_exceeds_supplied_maximum_record_obt_data) : showError(e)
             }
-          } else if ((guiMakeSpendInfo.publicAddress || publicAddress) && (!skipRecord || edgeSignedTransaction.currencyCode === FIO_STR)) {
+          } else if ((guiMakeSpendInfo.publicAddress != null || publicAddress != null) && (!skipRecord || edgeSignedTransaction.currencyCode === FIO_STR)) {
             const payerPublicAddress = wallet.publicWalletInfo.keys.publicKey
-            const amount = guiMakeSpendInfo.nativeAmount || '0'
-            let chainCode
-            if (edgeSignedTransaction.wallet && edgeSignedTransaction.wallet.currencyInfo) {
-              chainCode = edgeSignedTransaction.wallet.currencyInfo.currencyCode
-            }
+            const amount = guiMakeSpendInfo.nativeAmount ?? '0'
+            const chainCode = edgeSignedTransaction.wallet.currencyInfo.currencyCode
+
             try {
               recordSend(fioWallet, fioAddress, {
                 payeeFioAddress,
                 payerPublicAddress,
-                payeePublicAddress: guiMakeSpendInfo.publicAddress || publicAddress || '',
-                amount: amount && bns.div(amount, exchangeDenomination.multiplier, DECIMAL_PRECISION),
+                payeePublicAddress: guiMakeSpendInfo.publicAddress ?? publicAddress ?? '',
+                amount: amount && div(amount, exchangeDenomination.multiplier, DECIMAL_PRECISION),
                 currencyCode: edgeSignedTransaction.currencyCode,
                 chainCode: chainCode || guiWallet.currencyCode,
                 txid: edgeSignedTransaction.txid,
@@ -388,8 +387,8 @@ export const signBroadcastAndSave =
       } else if (
         edgeSignedTransaction &&
         edgeSignedTransaction.otherParams &&
-        edgeSignedTransaction.otherParams.transactionJson &&
-        edgeSignedTransaction.otherParams.transactionJson.fioAction === 'transferFioAddress' &&
+        edgeSignedTransaction.otherParams.action &&
+        edgeSignedTransaction.otherParams.action.name === 'transferFioAddress' &&
         e.json &&
         e.json.code === 500 &&
         e.json.error.code === 3050003
@@ -427,6 +426,8 @@ export const displayFeeAlert = async (currency: string, fee: string) => {
   return resolveValue === 'confirm'
 }
 
+let lastUpdateTransactionAmountNonce = 0
+
 export const updateTransactionAmount =
   (nativeAmount: string, exchangeAmount: string, walletId: string, currencyCode: string) => (dispatch: Dispatch, getState: GetState) => {
     const state = getState()
@@ -438,12 +439,12 @@ export const updateTransactionAmount =
 
     // Spend Info
     const fiatPerCrypto = getExchangeRate(state, currencyCode, isoFiatCurrencyCode)
-    const amountFiatString: string = bns.mul(exchangeAmount, fiatPerCrypto.toString())
+    const amountFiatString: string = mul(exchangeAmount, fiatPerCrypto.toString())
     const metadata: EdgeMetadata = { amountFiat: parseFloat(amountFiatString) }
     const guiMakeSpendInfo = { nativeAmount, metadata }
     const guiMakeSpendInfoClone = { ...guiMakeSpendInfo }
     const spendInfo = getSpendInfoWithoutState(guiMakeSpendInfoClone, sceneState, currencyCode)
-    const authType = getAuthRequired(state, spendInfo)
+    const authType = getAuthRequired(state, spendInfo, walletId)
 
     // Transaction Update
     dispatch({
@@ -459,9 +460,14 @@ export const updateTransactionAmount =
       return
     }
 
+    // Fixes race-condition caused by concurrent makeSpend calls from each
+    // key stroke from user input
+    const nonce = ++lastUpdateTransactionAmountNonce
+
     coreWallet
       .makeSpend(spendInfo)
       .then(edgeTransaction => {
+        if (nonce < lastUpdateTransactionAmountNonce) return
         dispatch({
           type: 'UI/SEND_CONFIRMATION/UPDATE_TRANSACTION',
           data: {
@@ -473,6 +479,7 @@ export const updateTransactionAmount =
         })
       })
       .catch(error => {
+        if (nonce < lastUpdateTransactionAmountNonce) return
         let customError
 
         if (error.labelCode && coreWallet.currencyInfo?.defaultSettings?.errorCodes[error.labelCode] != null) {

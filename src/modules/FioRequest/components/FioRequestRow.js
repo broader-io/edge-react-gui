@@ -1,6 +1,6 @@
 // @flow
 
-import { bns } from 'biggystring'
+import { mul } from 'biggystring'
 import type { EdgeDenomination } from 'edge-core-js'
 import * as React from 'react'
 import { View } from 'react-native'
@@ -176,7 +176,15 @@ export const FioRequestRowConnector = connect<StateProps, {}, OwnProps>(
     }
     const tokenCode = fioRequest.content.token_code.toUpperCase()
     try {
-      displayDenomination = getDisplayDenomination(state, tokenCode)
+      const { allCurrencyInfos } = state.ui.settings.plugins
+      const plugin = allCurrencyInfos.find(plugin => {
+        const { currencyCode: pluginCurrencyCode } = plugin
+        if (pluginCurrencyCode == null) return false
+        return pluginCurrencyCode.toUpperCase() === fioRequest.content.chain_code.toUpperCase()
+      })
+
+      if (plugin == null) throw new Error(`No plugin match for this chain code - ${fioRequest.content.chain_code.toUpperCase()}`)
+      displayDenomination = getDisplayDenomination(state, plugin.pluginId, tokenCode)
     } catch (e) {
       console.log('No denomination for this Token Code -', tokenCode)
     }
@@ -186,7 +194,7 @@ export const FioRequestRowConnector = connect<StateProps, {}, OwnProps>(
 
     const rateKey = `${tokenCode}_${isoFiatCurrencyCode}`
     const fiatPerCrypto = exchangeRates[rateKey] ?? '0'
-    const fiatAmount = formatNumber(bns.mul(fiatPerCrypto, fioRequest.content.amount), { toFixed: 2 }) || '0'
+    const fiatAmount = formatNumber(mul(fiatPerCrypto, fioRequest.content.amount), { toFixed: 2 }) || '0'
 
     return {
       displayDenomination,

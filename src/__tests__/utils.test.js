@@ -1,8 +1,9 @@
 // @flow
 /* globals describe test expect */
-import { bns } from 'biggystring'
+import { log10 } from 'biggystring'
 
 import { sanitizeDecimalAmount } from '../components/themed/FlipInput'
+import { getDenominationFromCurrencyInfo, getDisplayDenomination } from '../selectors/DenominationSelectors.js'
 import {
   autoCorrectDate,
   convertDisplayToNative,
@@ -10,7 +11,6 @@ import {
   convertNativeToDisplay,
   convertNativeToExchange,
   daysBetween,
-  getDenomination,
   getNewArrayWithItem,
   getNewArrayWithoutItem,
   getObjectDiff,
@@ -282,7 +282,6 @@ describe('isCompleteExchangeData', function () {
       const incompleteExchangeData = {
         primaryDisplayAmount: undefined,
         primaryDisplayName: 'BTC',
-        secondaryDisplaySymbol: '$',
         secondaryDisplayAmount: '4000',
         secondaryCurrencyCode: 'USD'
       }
@@ -298,23 +297,6 @@ describe('isCompleteExchangeData', function () {
       const incompleteExchangeData = {
         primaryDisplayAmount: '1',
         primaryDisplayName: undefined,
-        secondaryDisplaySymbol: '$',
-        secondaryDisplayAmount: '4000',
-        secondaryCurrencyCode: 'USD'
-      }
-      const expected = false
-      // $FlowExpectedError
-      const actual = isCompleteExchangeData(incompleteExchangeData)
-      expect(actual).toBe(expected)
-    })
-  })
-
-  describe('secondaryDisplaySymbol: undefined', function () {
-    test('incomplete => false', function () {
-      const incompleteExchangeData = {
-        primaryDisplayAmount: '1',
-        primaryDisplayName: 'BTC',
-        secondaryDisplaySymbol: undefined,
         secondaryDisplayAmount: '4000',
         secondaryCurrencyCode: 'USD'
       }
@@ -330,7 +312,6 @@ describe('isCompleteExchangeData', function () {
       const incompleteExchangeData = {
         primaryDisplayAmount: '1',
         primaryDisplayName: 'BTC',
-        secondaryDisplaySymbol: '$',
         secondaryDisplayAmount: undefined,
         secondaryCurrencyCode: 'USD'
       }
@@ -346,7 +327,6 @@ describe('isCompleteExchangeData', function () {
       const incompleteExchangeData = {
         primaryDisplayAmount: '1',
         primaryDisplayName: 'BTC',
-        secondaryDisplaySymbol: '$',
         secondaryDisplayAmount: '4000',
         secondaryCurrencyCode: undefined
       }
@@ -361,7 +341,6 @@ describe('isCompleteExchangeData', function () {
     const completeExchangeData = {
       primaryDisplayAmount: '1',
       primaryDisplayName: 'BTC',
-      secondaryDisplaySymbol: '$',
       secondaryDisplayAmount: '4000',
       secondaryCurrencyCode: 'USD'
     }
@@ -679,7 +658,7 @@ describe('precisionAdjust', function () {
     test(key, function () {
       const precisionAdjustmentValue = precisionAdjust({ primaryExchangeMultiplier, secondaryExchangeMultiplier, exchangeSecondaryToPrimaryRatio })
       expect(precisionAdjustmentValue).toBe(output.precisionAdjustmentValue)
-      expect(maxPrimaryCurrencyConversionDecimals(bns.log10(displayDenominationMultiplier), precisionAdjustmentValue)).toBe(
+      expect(maxPrimaryCurrencyConversionDecimals(log10(displayDenominationMultiplier), precisionAdjustmentValue)).toBe(
         output.maxPrimaryCurrencyConversionDecimals
       )
     })
@@ -687,23 +666,24 @@ describe('precisionAdjust', function () {
 })
 
 describe('getDisplayDenomination', function () {
-  const tests = fixtures.getDisplayDenomination
+  const { getDisplayDenomination: tests, state } = fixtures
   const { title, input, output } = tests
 
   input.forEach((currency, index) => {
-    test(`${title} ${currency}`, function () {
-      expect(getDenomination(currency, fixtures.settings, 'display')).toMatchObject(output[index])
+    test(`${title} ${currency.currencyCode}`, function () {
+      expect(getDisplayDenomination(state, currency.pluginId, currency.currencyCode)).toMatchObject(output[index])
     })
   })
 })
 
 describe('getExchangeDenomination', function () {
-  const tests = fixtures.getExchangeDenomination
+  const { getExchangeDenomination: tests, currencyInfos } = fixtures
   const { title, input, output } = tests
 
   input.forEach((currency, index) => {
     test(`${title} ${currency}`, function () {
-      expect(getDenomination(currency, fixtures.settings, 'exchange')).toMatchObject(output[index])
+      const currencyInfo = currencyInfos[currency] ?? currencyInfos.ETH
+      expect(getDenominationFromCurrencyInfo(currencyInfo, currency)).toMatchObject(output[index])
     })
   })
 })

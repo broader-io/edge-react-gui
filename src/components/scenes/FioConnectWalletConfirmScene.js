@@ -133,16 +133,16 @@ export class FioConnectWalletConfirm extends React.Component<Props, State> {
             <ButtonsModal
               bridge={bridge}
               title={s.strings.fio_no_bundled_err_msg}
-              message={s.strings.fio_no_bundled_renew_err_msg}
+              message={s.strings.fio_no_bundled_add_err_msg}
               buttons={{
-                ok: { label: s.strings.title_fio_renew_address },
-                cancel: { label: s.strings.string_cancel_cap }
+                ok: { label: s.strings.title_fio_add_bundled_txs }
               }}
+              closeArrow
             />
           ))
           if (answer === 'ok') {
             navigation.navigate('fioAddressSettings', {
-              showRenew: true,
+              showAddBundledTxs: true,
               fioWallet,
               fioAddressName: fioAddressName
             })

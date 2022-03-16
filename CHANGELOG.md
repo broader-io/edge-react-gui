@@ -1,5 +1,207 @@
 # edge-react-gui
 
+## 2.12.0 (2022-02-23)
+
+- Add BNB Smart Chain support
+- Add CELO support with CUSD and CEUR tokens
+- Add new swap partner Exolix
+- Add support for splitting between EVM-compatible chains
+- Show available unlocked balance in flip input
+- Add additional warning before display wallet private keys
+- Fix incorrect spend race condition
+- Add imported wallet flag to log output
+- Convert special currency info map keys from currency code to pluginId
+- Fix fee display in flip input
+- Import biggystring functions individually
+- Upgrade edge-core-js to v0.19.10
+  - fixed: Stop adding undefined entries to EdgeAccount.currencyWallets.
+  - added: Define a new EdgeToken type and make that available as EdgeCurrencyConfig.builtinTokens and EdgeCurrencyConfig.customTokens.
+  - added: Define a new EdgeCurrencyPlugin.getBuiltinTokens method, and use that to populate EdgeCurrencyConfig.builtinTokens when available.
+  - added: Pass EdgeToken fields to EdgeCurrencyEngine.addCustomToken, along with the existing EdgeMetaToken fields.
+  - added: EdgeCurrencyInfo.canReplaceByFee.
+  - deprecated: EdgeCurrencyInfo.defaultSettings
+  - deprecated: EdgeCurrencyInfo.metaTokens
+  - deprecated: EdgeCurrencyInfo.symbolImage
+  - deprecated: EdgeCurrencyInfo.symbolImageDarkMono
+  - added: Include an imported flag with all new wallet keys, to indicate whether they were derived freshly or imported from user-entered data.
+  - fixed: Do not hang forever if creating a currency engine fails.
+  - changed: Make denominationToNative and nativeToDenomination only look at the currencies available on the current wallet.
+  - changed: Add comments and improve organization in the public types file.
+  - changed: Use cleaners to load & save many files for additional safety.
+  - fixed: Improve wallet start-up performance by loading fewer files.
+- Upgrade edge-currency-accountbased to v0.14.1
+  - Add Binance Smart Chain (BNB) support
+  - Add Celo support
+  - Add getSplittableTypes method to ethEngine
+  - Use binary search in ethEngine's getMaxSpendable for main chain currency code
+  - Update ZEC checkpoints
+- Upgrade edge-exchange-plugins to v0.12.14
+  - Add Binance Smart Chain to swap partners
+  - Changelly: Add BNB Smart Chain support
+  - Changenow: Fix corner case where standard flow was skipped
+  - Exolix: Update plugin to use mainchain:tokencode values in requests
+  - Coingecko: Add Celo and Aave unique IDs
+  - Godex: Disable DGB selling
+  - Transfer: Use pluginIds instead of currency codes
+  - Fix calling denomination methods from wrong wallet
+  - Use pluginIds instead of currency code keys in transcription and invalid-code maps
+  - Add helper function and transcription maps for changing mainnet codes
+
+## 2.11.1 (2022-02-15)
+
+- Fix activation-needed wallet creation flow
+- Fix wallet picker token issue
+- Fix transaction details fiat amount for custom tokens
+- Fix BOO exchange rate
+
+## 2.11.0 (2022-02-14)
+
+- Add Solana (SOL) support
+- Add error localization
+- Fix staking end date display
+- Fix Bitpay error for unsupported currencies
+- Fix React Native Promise type-checking
+- Log error stack traces in development mode
+- Upgrade edge-core-js to v0.19.5
+  - changed: Send the optional keyOptions parameter through the importKey methods.
+  - fixed: Remove JCenter from the Android build file.
+- Upgrade edge-currency-accountbased to v0.12.2
+  - Add Solana (SOL)
+  - FIO: Abstract unlockDate calculation into a getUnlockDate method
+  - SOL: Use industry standard derivation path
+  - SOL: Prevent sending empty memo
+  - SOL: Update explorer links
+
+## 2.10.0 (2022-02-03)
+
+- FIO: Add staking support
+- Add many new AVAX, MATIC, and FTM tokens
+- Transak: Reenable India support
+- Add support for Bitpay JSON Payment Protocol v2
+- Fix max send for tokens
+- Disable activation-needed currencies from being created in Exchange scene
+- Fix Advanced transaction details device description
+- Fix race conditions in ManageTokensScene and Create wallet flow
+- Organize currency settings by pluginId
+- Consolidate denomination selectors
+- Allow archiving of broken wallets
+- Various visual fixes
+- Upgrade edge-core-js v0.19.4
+  - added: EdgeCurrencyWallet.stakingStatus, along with matching engine methods for returning and updating this.
+  - fixed: Removed unnecessary C++ compiler flags.
+  - fix: Correctly select swaps with the best price.
+  - fix: Correctly prefer swap plugins with active promo codes.
+  - changed: Add more logging to the swap procedure.
+  - fix: Only write the deviceDescription on sent transactions.
+  - fix: Add a native requiresMainQueueSetup method to silence a warning on iOS
+- Upgrade edge-currency-accountbased to v0.11.11
+  - FIO: Add edge-core-js staking API support
+  - FIO: Fix bugs with unlock dates
+  - FIO: Fix bug by removing zero-amount transactions for staking actions
+  - Add ETH, FTM, MATIC and AVAX EVM-based tokens
+  - Initialize walletLocalData balance when enabling tokens
+  - ZEC: Enable max spend
+  - ZEC: Update checkpoints
+  - Miscellaneous cleanups: improve logging, general refactoring and removal of dead code
+- Upgrade edge-exchange-plugins to v0.12.8
+  - Coingecko: Add new tokens
+  - Coingecko: Fix BNT unique ID
+  - Add constant rates for AVAX wrapped tokens
+
+## 2.9.0 (2022-01-14)
+
+- Add Avalanche (AVAX) C-Chain support
+- iOS: Add Zcash support
+- iOS: Require iOS 12 or newer
+- Redesign flip input modal
+- XRP: Update reserve balance requirement to 10 XRP
+- FIO: Requests from connected wallets now default from associated FIO name
+- Fix FIO bundle purchase modal logic
+- Remove receiving wallet balance check in Exchange scene
+- Android: Replace jcenter with mavenCentral
+- Various visual fixes and improvements
+- Update translations
+- Fix git URLs for dependencies
+- Upgrade react-native-mail to v6.1.1
+- Upgrade edge-core-js to v0.19.1
+  - changed: Simplify the React Native integration to "just work".
+    - Stop depending on external libraries such as react-native-fast-crypto, react-native-randombytes, or react-native-webview.
+    - Use React Native auto-linking to integrate all native code, HTML, and Javascript needed to run the core.
+    - Accept core plugins via a pluginUris prop to MakeEdgeContext or MakeFakeEdgeWorld.
+    - Allow core debugging by running yarn start in this repo to start a dev server, and then setting the debug prop to true.
+    - Accept an allowDebugging prop on Android to enable WebView debugging in general (useful for debugging plugins).
+  - changed: Require EdgeCurrencyEngine methods to return promises.
+  - changed: Mark methods as readonly in the TypeScript definitions, to match what Flow was already doing.
+  - changed: Write files atomically on Android, so out-of-disk and other errors do not lead to data corruption.
+  - fixed: Upgrade edge-sync-client, so info server errors are no longer fatal.
+  - fixed: Do not destroy the core WebView when opening Safari links on iOS.
+  - fixed: Allow logins with an appId to approve or reject vouchers.
+  - added: Allow maximum swaps by passing "max" to EdgeSwapRequest.quoteFor.
+  - added: Add an EdgeCurrencyEngine.getMaxSpendable method for native max-spend calculations.
+- Upgrade edge-currency-accountbased to v0.11.7
+  - ZEC: Upgrade to react-native-zcash v0.2.0
+  - XRP: Migrate from ripple-lib to xrpl
+  - ZEC: Prevent spending until engine is fully synced
+  - Fix git URLs for dependencies
+- Upgrade edge-currency-bitcoin to v4.9.20
+  - Support mixed case Bridge Address prefix
+- Upgrade edge-currency-monero to v0.3.4
+  - Update dependencies to use 'https://' instead of 'git://'
+- Upgrade edge-exchange-plugins to v0.12.7
+  - ChangeNow: Upgrade to v2 API
+  - Godex: Restrict AVAX trading to the AVAXC network
+  - Godex: Re-enable FTM trading
+  - Prevent AVAX token trading on partners without mainnet identification
+  - Coingecko: Add AVAX
+- Upgrade edge-login-ui-rn to v0.9.29
+  - Update dependencies to use 'https://' instead of 'git://'
+
+## 2.8.1 (2022-01-07)
+
+- MATIC: Fix syncing issue
+- Add a WalletConnect deep link type
+- Various Wallet Connect Fixes
+- Fix Android deep link handling
+- Add support for Ren Bridge Gateway URI
+- FIO: Add option to add Bundled Transactions
+- Upgrade edge-currency-accountbased to v0.11.2
+  - Fixed WalletConnect Rarible bug
+  - MATIC: Add 5 more RPC servers
+  - ETH: Add eth_signTypedData_v4 support
+  - FIO: Replace additional network call with bundle constant
+  - Add Avalanche (AVAX)
+  - FIO: Add addBundledTransactions action
+  - Support Wallet Connect across all ETH-like currencies
+  - Add support for RenBridge Gateway address URI
+- Upgrade edge-currency-bitcoin to v4.9.19
+  - Add support for RenBridge Gateway address URI
+
+## 2.8.0 (2021-12-21)
+
+- Add Polygon (MATIC)
+- FIO: Remove name expiration details
+- Enforce memo field length limits from currency plugins
+- Add terms agreement modal
+- Add prompt to enable camera permission on scan modal
+- Various visual fixes
+- Update translations
+- Upgrade edge-core-js to v0.18.13
+  - added: EdgeSpendTarget.memo, which is a renamed version of EdgeSpendTarget.uniqueIdentifier.
+  - added: EdgeCurrencyInfo.memoType, EdgeCurrencyInfo.memoMaxLength, EdgeCurrencyInfo.memoMaxValue. Use these to learn which currencies support memos.
+  - added: EdgeCurrencyTools.validateMemo & EdgeCurrencyWallet.validateMemo. Use these to check memos for validity before sending.
+  - deprecated: EdgeSpendTarget.uniqueIdentifier. Use EdgeSpendTarget.memo instead.
+  - fixed: Gracefully handle errors while reading the exchange-rate hint cache.
+  - fixed: Correctly match server-returned children with their on-disk stash entries. This produces more accurate errors if the server loses a child.
+- Upgrade edge-currency-accountbased to v0.10.4
+  - Add Polygon
+  - Add memoMaxLength parameter to currencyInfos
+  - Add support for multiple polygonscan api keys
+  - Remove FIO name expiration
+  - ZEC: Update checkpoints
+- Upgrade edge-exchange-plugins to v0.12.4
+  - Add ability to restrict all token codes per mainchain
+  - Prevent MATIC ERC20 trading
+
 ## 2.7.0 (2021-12-10)
 
 - Banxa: Add credit card and Interac payment methods in Canada
@@ -23,6 +225,11 @@
   - Various minor fixes for account creation process
 - Upgrade edge-currency-accountbased to v0.9.3
   - Update ZEC checkpoints
+
+## 2.6.1 (2021-11-24)
+
+- Force Android to create a compressed APK to reduce app size
+- Fix ZEC Trasaction Exchange details
 
 ## 2.6.0 (2021-11-21)
 
